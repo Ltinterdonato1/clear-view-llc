@@ -9,15 +9,15 @@ Clear View LLC is a service-based application designed to automate window cleani
 
 ### Tech Stack
 - **Frontend:** Next.js 15 (App Router), Tailwind CSS, Lucide Icons.
-- **Backend/DB:** Firebase (Firestore, Auth, Functions).
-- **Integrations:** Stripe (Payments), Firebase Mail Extension (Automated Emails).
+- **Backend/DB:** Firebase (Firestore, Auth, Functions v2).
+- **Integrations:** Stripe (Payments via internal API), Firebase Mail Extension (Automated Emails).
 
 ---
 
 ## 2. User Personas & Flows
 
 ### A. Customer Flow (Public)
-1.  **Landing Page:** Hero section with "Instant Quote" CTA.
+1.  **Landing Page:** Hero section with "Instant Quote" CTA. Includes verified reviews for all 4 primary locations (Tri-Cities, Walla Walla, Tacoma, Puyallup).
 2.  **Quote Discovery:** Visual service selection to help customers identify their needs (e.g., window count, home size, driveway size).
 3.  **Booking Engine (`QuoteModal`):**
     *   **Step 1 (Contact):** Gather name, address, and home details.
@@ -26,7 +26,7 @@ Clear View LLC is a service-based application designed to automate window cleani
     *   **Step 4 (Review):** Confirm details and final price.
 4.  **Completion:** 
     *   New record created in `leads` collection.
-    *   Confirmation email triggered via `mail` collection (Firebase Extension).
+    *   Confirmation email triggered via **Double-Write Strategy**: writes direct HTML to `mail` collection AND template data to `leads`.
 
 ### B. Employee Flow (Staff Portal)
 1.  **Login:** Role-based redirection from `/login` to `/employee`.
@@ -36,9 +36,13 @@ Clear View LLC is a service-based application designed to automate window cleani
 
 ### C. Admin Flow (Management)
 1.  **Dashboard:** High-level overview of revenue, active crew status, and upcoming job volume.
-2.  **Staff Management:** Admin can onboard employees, set roles (`admin` vs `employee`), and review performance.
+2.  **Staff Management:** Admin can onboard employees, set roles (`admin` vs `employee`), force clock-out staff, and review performance.
 3.  **Payroll & Reports:** Automatically calculates hours from attendance logs and generates revenue reports.
-4.  **Manual Booking:** Allows the business owner to manually enter leads (phone-ins) into the system.
+4.  **Manual Booking:** Allows the business owner to manually enter leads (phone-ins) into the system with automatic email confirmations.
+5.  **Job Management (`JobCard`):** 
+    *   **Resend Confirmation:** Manually triggers a professional confirmation email.
+    *   **Email Invoice:** Generates a real-time Stripe checkout link and emails it to the customer.
+    *   **Complete Job:** Processes final payment method (Card, Cash, Check) and sends a "Paid in Full" receipt.
 
 ---
 
@@ -50,62 +54,52 @@ Clear View LLC is a service-based application designed to automate window cleani
     - `firstName`, `lastName`, `email`, `phone`: Customer contact info.
     - `address`, `city`: Job location.
     - `homeSize`, `stories`, `windowCount`: Property details used for pricing.
-    - `selectedServices`: Array of services (e.g., ["Window Cleaning", "Gutter Cleaning"]).
+    - `selectedServices`: Array of services.
     - `total`: Final quoted price.
-    - `status`: "New", "Confirmed", "In Progress", "Completed", "Cancelled".
-    - `actualBookedDays`: Array of Timestamps for multi-day jobs.
-    - `totalMinutes`: Calculated labor time.
+    - `status`: "New", "Confirmed", "In Progress", "Completed", "Archived".
+    - `isNotification`: (Boolean) If true, document is used for email triggering and hidden from calendar/board.
+    - `template`: (Object) Contains `name` and `data` for the Email Extension.
 
 ### `employees` (Collection)
 *Employee profiles and access control.*
 - **ID:** Email address (lowercase).
-- **Fields:** `name`, `role` ("admin" | "employee"), `status` ("clocked_in" | "clocked_out").
-- **Sub-collection `attendance`:**
-    - `startTime` (Timestamp), `endTime` (Timestamp), `date` (String), `totalHours` (Number).
+- **Sub-collection `attendance`:** Tracks `startTime`, `endTime`, and `totalHours`.
 
 ### `mail` (Collection)
 *Triggers for the Firebase Trigger Email extension.*
-- **Fields:** `to` (Array), `template` (Object with `name` and `data`).
+- **Trigger Logic:** Uses Direct HTML writes for guaranteed delivery across all browser environments.
+
+### `email_templates` (Collection)
+*Storage for professional email designs (Confirmation, Invoice, Receipt).*
 
 ---
 
 ## 4. Business Logic Key Rules
 
 ### Pricing Engine (`BASE_PRICES`)
-- **Minimum Service Fee:** $175 (Ensures profitability on small jobs).
-- **Travel Surcharge:** $80 (Applied to Yakima, Selah, Sunnyside, etc.).
-- **Ladder Fees:** Added for 2-story ($50) or 3-story ($75) jobs.
-- **Bundle Discounts:**
-    - 2 services: 10% off.
-    - 3+ services: 20% off.
+- **Minimum Service Fee:** $175.
+- **Bundle Discounts:** 10% for 2 services, 20% for 3+ services.
+- **Multi-Day Logic:** Jobs exceeding 540 minutes are automatically split across multiple calendar days.
 
-### Scheduling Logic
-- **Work Day:** System assumes a 7.5-hour (450 mins) standard work day per crew.
-- **Modes:**
-    - **Standard:** Single slot job.
-    - **Split:** Job requiring multiple sessions.
-    - **All Day Block:** Large jobs (Enterprise) that lock out the calendar until complete.
-- **Duration Calculation:** 
-    - e.g., Window Cleaning: 5-9 mins per window + setup time.
-    - e.g., Gutter Cleaning: Base time based on house size + addon time for flushing/polishing.
+### Email Delivery (Stability Rules)
+- **Double-Write Strategy:** To ensure 100% delivery, the system writes to both the `mail` and `leads` collections.
+- **Sanitization:** All Firestore writes pass through a `sanitize` helper to remove `undefined` fields and prevent data crashes.
+- **Notification Filtering:** Background triggers are filtered out of the Dispatch Board using `isNotification` checks in `scheduleUtils.ts`.
+
+### Payment Integration (Stripe)
+- **Session Generation:** Uses internal API route `/api/stripe/create-checkout-session` for immediate link generation, bypassing Firestore permission delays.
 
 ---
 
 ## 5. Testing Strategy
 The project maintains a rigorous testing suite focused on verifying business logic and UI integrity.
-
-### Infrastructure
-- **Framework:** Vitest
-- **Environment:** JSDOM
-- **Libraries:** React Testing Library
-
-### Coverage Areas
-1.  **Utilities (`src/lib/scheduleUtils.test.ts`):** Tests for pricing, time estimation, and calendar occupancy logic.
-2.  **Booking Workflow (`src/components/QuoteModal/*.test.tsx`):** Verification of form validation, service selection, and scheduling mode transitions (Single/Split/Block).
-3.  **Operations (`src/components/schedule/JobCard.test.tsx`):** Security and functionality of the on-site job management interface for crew.
+- **Utilities:** Pricing, time estimation, and calendar occupancy.
+- **Workflow:** Step transitions and validation in the booking engine.
+- **Security:** Verification of lock/unlock mechanisms and tech assignments.
 
 ---
 
 ## 6. Deployment & Maintenance
-- **Hosting:** Vercel (Next.js) + Firebase (Backend).
-- **Security:** Firestore Security Rules ensure employees can only see relevant data and admins have full access.
+- **GitHub:** Source control for all frontend and Cloud Function logic.
+- **Vercel:** Preferred hosting for Next.js 15 and Node.js API support.
+- **Security:** Multi-layer security via Firestore Rules, Auth Custom Claims, and environment variables.
