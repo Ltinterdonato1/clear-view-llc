@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Admin check
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'clearview3cleaners@gmail.com' ||
+        request.auth.token.email == 'mcmullenhannah21@gmail.com'
+      );
+    }
+    
+    // Helper: Staff check (Admin or Employee)
+    function isStaff() {
+      return request.auth != null;
+    }
+
+    // 1. LEADS: Public can create, Staff can manage
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // 2. MAIL: Automated confirmations & invoices
+    match /mail/{mailId} {
+      allow create: if true; 
+      allow read, update, delete: if isAdmin();
+    }
+
+    // 3. STRIPE & CUSTOMERS: Required for Invoice button to work
+    match /customers/{uid} {
+      allow read, write: if isStaff(); 
+      match /checkout_sessions/{id} {
+        allow read, write: if isStaff();
+      }
+      match /payments/{id} {
+        allow read: if isStaff();
+      }
+    }
+
+    // 4. USERS & EMPLOYEES
+    match /users/{uid} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+    match /employees/{id} {
+      allow read, create, update: if isStaff();
+      allow delete: if isAdmin();
+      
+      match /attendance/{shiftId} {
+        allow read, write: if isStaff();
+      }
+    }
+    
+    // 5. EMAIL TEMPLATES: Required for extension to fetch designs
+    match /email_templates/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /email_template/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // 6. TIMECARDS & REFERRALS
+    match /timecards/{id} {
+      allow read, write: if isStaff();
+    }
+    match /referral_bank/{id} {
+      allow read, create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+  }
+}

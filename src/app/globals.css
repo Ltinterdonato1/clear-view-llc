@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  /* Adding '-color-' makes Tailwind generate the utility classes automatically */
+  --color-brand-blue: #2563eb;
+  --color-brand-orange: #f97316;
+  
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-slate-900 antialiased;
+  }
+}
