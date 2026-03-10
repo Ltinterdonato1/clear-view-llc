@@ -1,11 +1,16 @@
 import Stripe from 'stripe';
 import { NextResponse } from 'next/server';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2026-01-28.clover',
-});
+export const dynamic = 'force-dynamic';
+
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-01-28.clover' })
+  : null;
 
 export async function POST(request: Request) {
+  if (!stripe) {
+    return NextResponse.json({ error: 'Stripe is not configured on this server.' }, { status: 500 });
+  }
   try {
     const body = await request.json();
     const { leadId, customerEmail, customerName } = body;
