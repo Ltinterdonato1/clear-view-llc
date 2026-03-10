@@ -15,9 +15,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 // --- 1. Stripe Checkout Generation ---
-exports.createStripeCheckout = onCall(async (request) => {
-  // Check auth if needed: if (!request.auth) throw new HttpsError("unauthenticated", "Login required.");
-  
+exports.createStripeCheckout = onCall({ secrets: ["STRIPE_SECRET_KEY"] }, async (request) => {
   const data = request.data;
   const { leadId, customerEmail, customerName } = data;
   const amount = parseFloat(data.amount) || 0;

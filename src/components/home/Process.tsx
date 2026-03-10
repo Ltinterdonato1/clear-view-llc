@@ -34,7 +34,7 @@ export default function Process() {
 
         <div className="grid lg:grid-cols-2 gap-16 xl:gap-24 items-center">
           
-          <div className="space-y-16">
+          <div className="space-y-16 text-center">
             {steps.map((step, i) => (
               <div key={i} className="group">
                 <div className="sm:col-span-3">

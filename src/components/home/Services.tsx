@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
 import Image from 'next/image';
 
 const services = [
@@ -34,15 +34,14 @@ const services = [
     image: "/img/Solar_Panel_Cleaning.jpg"
   }
 ];
-export default function Services() {
-  const [activeTab, setActiveTab] = useState(0);
 
+export default function Services() {
   return (
     <section className="py-24 bg-white overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
         
-        {/* HEADER: Adjusted for exact sizing */}
-        <div className="mb-20 text-center">
+        {/* HEADER */}
+        <div className="mb-32 text-center">
           <span className="text-black font-bold tracking-[0.3em] uppercase text-[10px] mb-4 block">
             Our Expertise
           </span>
@@ -52,60 +51,41 @@ export default function Services() {
           </h2>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-16 items-start">
-          
-          {/* SERVICE SELECTION */}
-          <div className="w-full lg:w-5/12">
-            {services.map((service, index) => (
-              <div key={index} className="border-b border-slate-100 last:border-0">
-                <button
-                  onMouseEnter={() => setActiveTab(index)}
-                  onClick={() => setActiveTab(index)}
-                  className={`w-full text-left py-8 transition-all duration-500 ${
-                    activeTab === index ? "opacity-100" : "opacity-20 hover:opacity-40"
-                  }`}
-                >
-                  {/* TITLE: Matches 'Professional Solutions' size/weight */}
-                  <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter leading-none">
-                    {service.title}
-                  </h3>
-                  
-                  {/* DESCRIPTION: Matches 'a Crystal Clear View' font/color */}
-                  <div className={`overflow-hidden transition-all duration-700 ease-in-out ${
-                    activeTab === index ? "max-h-96 mt-6" : "max-h-0"
-                  }`}>
-                    <p className="text-xl md:text-2xl font-serif italic text-slate-400 leading-tight pr-10">
-                      {service.description}
-                    </p>
-                    
-                    {/* Mobile Image */}
-                    <div className="lg:hidden relative aspect-[16/10] w-full mt-8 rounded-[2rem] overflow-hidden shadow-2xl">
-                      <Image src={service.image} alt={service.title} fill className="object-cover" />
-                    </div>
-                  </div>
-                </button>
+        {/* SERVICES LIST */}
+        <div className="space-y-32">
+          {services.map((service, index) => (
+            <div 
+              key={index} 
+              className={`flex flex-col lg:flex-row items-center gap-12 lg:gap-24 ${
+                index % 2 === 1 ? 'lg:flex-row-reverse' : ''
+              }`}
+            >
+              {/* TEXT CONTENT */}
+              <div className="w-full lg:w-1/2 text-center lg:text-left">
+                <span className="text-blue-500 font-black text-[10px] tracking-[0.4em] uppercase mb-6 block">
+                  Service 0{index + 1}
+                </span>
+                <h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tighter leading-none mb-8">
+                  {service.title}
+                </h3>
+                <p className="text-xl md:text-2xl font-serif italic text-slate-400 leading-tight lg:pr-10">
+                  {service.description}
+                </p>
               </div>
-            ))}
-          </div>
 
-          {/* DESKTOP VISUAL */}
-          <div className="hidden lg:block lg:w-7/12 sticky top-24">
-            <div className="relative aspect-[4/3] w-full rounded-[4rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.25)] bg-slate-50">
-              {services.map((service, index) => (
-                <Image
-                  key={index}
-                  src={service.image}
-                  alt={service.title}
-                  fill
-                  priority={index === 0}
-                  className={`object-cover transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] ${
-                    activeTab === index ? "opacity-100 scale-100" : "opacity-0 scale-110"
-                  }`}
-                />
-              ))}
+              {/* IMAGE */}
+              <div className="w-full lg:w-1/2">
+                <div className="relative aspect-[16/10] lg:aspect-[4/3] w-full rounded-[2.5rem] lg:rounded-[4rem] overflow-hidden shadow-[0_40px_80px_-15px_rgba(0,0,0,0.15)] bg-slate-50 group">
+                  <Image 
+                    src={service.image} 
+                    alt={service.title} 
+                    fill 
+                    className="object-cover transition-transform duration-700 group-hover:scale-105" 
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-
+          ))}
         </div>
       </div>
     </section>
