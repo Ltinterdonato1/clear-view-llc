@@ -9,19 +9,26 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: 🔍 Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: ⚙️ Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: 🔐 Verify Secrets
+        run: |
+          if [ -z "${{ secrets.FTP_SERVER }}" ]; then echo "❌ FTP_SERVER is missing"; exit 1; fi
+          if [ -z "${{ secrets.FTP_USERNAME }}" ]; then echo "❌ FTP_USERNAME is missing"; exit 1; fi
+          if [ -z "${{ secrets.FTP_PASSWORD }}" ]; then echo "❌ FTP_PASSWORD is missing"; exit 1; fi
+          echo "✅ All deployment secrets are present."
+
+      - name: 📦 Install Dependencies
         run: npm ci
 
-      - name: Build Static Site
+      - name: 🏗️ Build Static Site
         run: npm run build
 
       - name: 🚀 FTP Deploy to GoDaddy
@@ -31,4 +38,5 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./out/
-          server-dir: public_html/
+          server-dir: /public_html/
+          protocol: ftp
