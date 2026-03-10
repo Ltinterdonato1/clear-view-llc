@@ -31,7 +31,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./out/
-          server-dir: public_html/clearviewtricity.com/
+          server-dir: /public_html/clearviewtricity.com/
           protocol: ftp
           delete: true
           dry-run: true
