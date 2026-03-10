@@ -33,3 +33,4 @@ jobs:
           local-dir: ./out/
           server-dir: public_html/clearviewtricity.com/
           protocol: ftp
+          delete: true
