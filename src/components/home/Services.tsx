@@ -62,9 +62,6 @@ export default function Services() {
             >
               {/* TEXT CONTENT */}
               <div className="w-full lg:w-1/2 text-center lg:text-left">
-                <span className="text-blue-500 font-black text-[10px] tracking-[0.4em] uppercase mb-6 block">
-                  Service 0{index + 1}
-                </span>
                 <h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tighter leading-none mb-8">
                   {service.title}
                 </h3>
