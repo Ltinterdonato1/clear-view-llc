@@ -34,3 +34,4 @@ jobs:
           server-dir: public_html/clearviewtricity.com/
           protocol: ftp
           delete: true
+          dry-run: true
