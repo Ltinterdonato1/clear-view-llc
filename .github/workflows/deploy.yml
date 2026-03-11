@@ -18,13 +18,6 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: 🔐 Verify Secrets
-        run: |
-          if [ -z "${{ secrets.FTP_SERVER }}" ]; then echo "❌ FTP_SERVER is missing"; exit 1; fi
-          if [ -z "${{ secrets.FTP_USERNAME }}" ]; then echo "❌ FTP_USERNAME is missing"; exit 1; fi
-          if [ -z "${{ secrets.FTP_PASSWORD }}" ]; then echo "❌ FTP_PASSWORD is missing"; exit 1; fi
-          echo "✅ All deployment secrets are present."
-
       - name: 📦 Install Dependencies
         run: npm ci
 
@@ -39,3 +32,5 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./out/
           server-dir: /public_html/clearviewtricity.com/
+          port: 21
+          timeout: 60000
