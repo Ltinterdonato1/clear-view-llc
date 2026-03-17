@@ -492,6 +492,8 @@ export default function UnifiedPayrollStaff() {
                           </div>
                           <div className="space-y-2">
                             {isAddingPunch ? (
+                              const isSelf = currentUser?.email === emp.email;
+
                               <AddPunchForm
                                 employeeId={expandedTechId!}
                                 hourlyRate={emp.hourlyRate}
