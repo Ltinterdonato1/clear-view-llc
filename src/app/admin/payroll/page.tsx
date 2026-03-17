@@ -491,10 +491,10 @@ export default function UnifiedPayrollStaff() {
                             </button>
                           </div>
                           <div className="space-y-2">
-                            {isAddingPunch ? (
+                            {isAddingPunch ? (() => {
                               const isSelf = currentUser?.email === emp.email;
 
-                              <AddPunchForm
+                              return <AddPunchForm
                                 employeeId={expandedTechId!}
                                 hourlyRate={emp.hourlyRate}
                                 vacationBalance={emp.vacationBalance || 0}
@@ -506,7 +506,8 @@ export default function UnifiedPayrollStaff() {
                                   setRefreshTrigger(prev => prev + 1);
                                 }}
                                 onCancel={() => setIsAddingPunch(false)}
-                              />
+                              />;
+                            })() : (null)}
                             ) : (null)}
                             {expandedPunches.map(punch => (
                               <div key={punch.id}>
