@@ -497,6 +497,7 @@ export default function UnifiedPayrollStaff() {
                                 hourlyRate={emp.hourlyRate}
                                 vacationBalance={emp.vacationBalance || 0}
                                 sickBalance={emp.sickBalance || 0}
+                                readOnlyRate={isSelf && !isOwner}
                                 onSave={() => { 
                                   setIsAddingPunch(false); 
                                   fetchPunches(); 
@@ -514,6 +515,7 @@ export default function UnifiedPayrollStaff() {
                                     hourlyRate={emp.hourlyRate}
                                     vacationBalance={emp.vacationBalance || 0}
                                     sickBalance={emp.sickBalance || 0}
+                                    readOnlyRate={isSelf && !isOwner}
                                     onSave={() => { 
                                       setEditingPunch(null); 
                                       fetchPunches(); 
