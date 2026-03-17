@@ -64,6 +64,7 @@ export default function UnifiedPayrollStaff() {
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const isOwner = currentUser?.email === OWNER_EMAIL;
 
   // PAYROLL STATE
   const [payrollData, setPayrollData] = useState<any[]>([]);
@@ -615,7 +616,6 @@ export default function UnifiedPayrollStaff() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
                 {employees.map((member) => {
                   const isExpanded = expandedStaffId === member.id;
-                  const isOwner = currentUser?.email === OWNER_EMAIL;
                   const isSelf = currentUser?.email === member.email;
                   const canEdit = isOwner || (!isSelf);
 
