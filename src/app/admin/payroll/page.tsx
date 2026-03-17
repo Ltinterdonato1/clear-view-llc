@@ -608,7 +608,7 @@ export default function UnifiedPayrollStaff() {
                   const isExpanded = expandedStaffId === member.id;
                   const isOwner = currentUser?.email === OWNER_EMAIL;
                   const isSelf = currentUser?.email === member.email;
-                  const canEdit = isOwner || isSelf;
+                  const canEdit = isOwner;
 
                   return (
                     <div key={member.id} className={`group bg-white rounded-[2.5rem] border-2 transition-all duration-500 overflow-hidden ${isExpanded ? 'border-slate-900 shadow-2xl scale-[1.01]' : 'border-slate-50 hover:border-slate-200 hover:shadow-xl'}`}>
@@ -643,13 +643,13 @@ export default function UnifiedPayrollStaff() {
                                 <button
                                   key={r}
                                   type="button"
-                                  disabled={!canEdit}
+                                  disabled={!isOwner}
                                   onClick={() => setEmployees(employees.map(s => s.id === member.id ? { ...s, role: r } : s))}
                                   className={`px-4 py-3 rounded-xl font-black text-[9px] uppercase italic transition-all border-2 ${
                                     member.role === r
                                       ? 'bg-slate-900 border-slate-900 text-white'
                                       : 'bg-white border-white text-slate-300 hover:border-slate-200'
-                                  } ${!canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  } ${!isOwner ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                   {r.replace('_', ' ')}
                                 </button>
