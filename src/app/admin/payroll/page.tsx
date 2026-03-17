@@ -608,7 +608,7 @@ export default function UnifiedPayrollStaff() {
                   const isExpanded = expandedStaffId === member.id;
                   const isOwner = currentUser?.email === OWNER_EMAIL;
                   const isSelf = currentUser?.email === member.email;
-                  const canEdit = isOwner;
+                  const canEdit = isOwner || (member.role !== 'admin' && !isSelf);
 
                   return (
                     <div key={member.id} className={`group bg-white rounded-[2.5rem] border-2 transition-all duration-500 overflow-hidden ${isExpanded ? 'border-slate-900 shadow-2xl scale-[1.01]' : 'border-slate-50 hover:border-slate-200 hover:shadow-xl'}`}>
