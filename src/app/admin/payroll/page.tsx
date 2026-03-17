@@ -509,44 +509,48 @@ export default function UnifiedPayrollStaff() {
                               />;
                             })() : (null)}
                             ) : (null)}
-                            {expandedPunches.map(punch => (
-                              <div key={punch.id}>
-                                {editingPunch?.id === punch.id ? (
-                                  <EditablePunchRow 
-                                    punch={punch} 
-                                    employeeId={expandedTechId!} 
-                                    hourlyRate={emp.hourlyRate}
-                                    vacationBalance={emp.vacationBalance || 0}
-                                    sickBalance={emp.sickBalance || 0}
-                                    readOnlyRate={isSelf && !isOwner}
-                                    onSave={() => { 
-                                      setEditingPunch(null); 
-                                      fetchPunches(); 
-                                      setRefreshTrigger(prev => prev + 1);
-                                    }}
-                                    onCancel={() => setEditingPunch(null)}
-                                  />
-                                ) : (
-                                  <div className="grid grid-cols-7 gap-2 items-center p-3 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 text-left">
-                                    <div className="col-span-2 flex items-center gap-3">
-                                      <p className="text-xs font-black text-slate-900 italic tracking-tighter">{punch.startTime?.toDate().toLocaleDateString()}</p>
+                            {expandedPunches.map(punch => {
+                              const isSelf = currentUser?.email === emp.email;
+
+                              return (
+                                <div key={punch.id}>
+                                  {editingPunch?.id === punch.id ? (
+                                    <EditablePunchRow 
+                                      punch={punch} 
+                                      employeeId={expandedTechId!} 
+                                      hourlyRate={emp.hourlyRate}
+                                      vacationBalance={emp.vacationBalance || 0}
+                                      sickBalance={emp.sickBalance || 0}
+                                      readOnlyRate={isSelf && !isOwner}
+                                      onSave={() => { 
+                                        setEditingPunch(null); 
+                                        fetchPunches(); 
+                                        setRefreshTrigger(prev => prev + 1);
+                                      }}
+                                      onCancel={() => setEditingPunch(null)}
+                                    />
+                                  ) : (
+                                    <div className="grid grid-cols-7 gap-2 items-center p-3 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 text-left">
+                                      <div className="col-span-2 flex items-center gap-3">
+                                        <p className="text-xs font-black text-slate-900 italic tracking-tighter">{punch.startTime?.toDate().toLocaleDateString()}</p>
+                                      </div>
+                                      <p className="text-xs font-bold text-slate-400">{punch.startTime?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                      <p className="text-xs font-bold text-slate-400">{punch.endTime?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                      <p className="text-xs font-black text-slate-900 italic">{punch.totalHours?.toFixed(2)}h</p>
+                                      <p className={`text-[9px] font-black uppercase text-left italic ${punch.type === 'work' ? 'text-slate-300' : 'text-blue-600'}`}>{punch.type?.replace('_', ' ') || 'work'}</p>
+                                      <div className="flex justify-end gap-3 px-2">
+                                        <button onClick={() => setEditingPunch(punch)} className="text-slate-300 hover:text-blue-600 transition-colors">
+                                          <Edit size={16} />
+                                        </button>
+                                        <button onClick={() => handleDeletePunch(punch, emp)} className="text-slate-300 hover:text-red-500 transition-colors">
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
                                     </div>
-                                    <p className="text-xs font-bold text-slate-400">{punch.startTime?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    <p className="text-xs font-bold text-slate-400">{punch.endTime?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    <p className="text-xs font-black text-slate-900 italic">{punch.totalHours?.toFixed(2)}h</p>
-                                    <p className={`text-[9px] font-black uppercase text-left italic ${punch.type === 'work' ? 'text-slate-300' : 'text-blue-600'}`}>{punch.type?.replace('_', ' ') || 'work'}</p>
-                                    <div className="flex justify-end gap-3 px-2">
-                                      <button onClick={() => setEditingPunch(punch)} className="text-slate-300 hover:text-blue-600 transition-colors">
-                                        <Edit size={16} />
-                                      </button>
-                                      <button onClick={() => handleDeletePunch(punch, emp)} className="text-slate-300 hover:text-red-500 transition-colors">
-                                        <Trash2 size={16} />
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                                  )}
+                                </div>
+                              );
+                            })}
                             {expandedPunches.length >= punchesLimit && (
                               <button
                                 onClick={() => setPunchesLimit(p => p + 8)}
