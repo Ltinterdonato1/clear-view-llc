@@ -5,7 +5,8 @@ import { collection, query, onSnapshot, orderBy, doc, updateDoc, addDoc, serverT
 import { onAuthStateChanged } from 'firebase/auth';
 import { 
   ChevronLeft, ChevronRight, X, Banknote, Mail, 
-  CreditCard, Loader2, ArrowRight, Receipt, MessageSquare, Smartphone, CheckSquare, Calendar
+  CreditCard, Loader2, ArrowRight, Receipt, MessageSquare, Smartphone, CheckSquare, Calendar,
+  Activity, MapPin, User, ChevronDown, Filter, Zap, Clock
 } from 'lucide-react';
 import { startOfDay, startOfWeek, addDays, addMonths, subMonths, addWeeks, subWeeks, isSameDay, format } from 'date-fns';
 import { getDayOccupancySummary, filterJobsBySelectedDay, calculateJobStats } from '../../../lib/scheduleUtils';
@@ -342,181 +343,272 @@ ${finalBreakdown}
   };
 
   return (
-    <div className="p-6 md:p-12 space-y-12 min-h-screen bg-slate-50/50 text-left font-sans">
-      <div className="max-w-7xl mx-auto space-y-12">
-        <div className="w-full text-center py-4">
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">My Schedule</h1>
-          <p className="text-emerald-600 font-black uppercase text-[9px] tracking-[0.4em] italic mt-4">Crew Dispatch Portal</p>
+    <div className="p-4 md:p-8 lg:p-12 xl:p-16 space-y-12 min-h-screen bg-white text-left font-sans text-slate-900 max-w-[1600px] mx-auto">
+      <div className="space-y-12">
+        {/* HEADER MATCHING TERMINAL STYLE */}
+        <div className="flex flex-col xl:flex-row justify-end items-center gap-8 border-b border-slate-100 pb-12">
+          <div className="flex items-center gap-8">
+            <div className="flex flex-col items-end">
+              <p className="text-slate-400 font-black uppercase text-[8px] tracking-[0.4em] mb-1 italic leading-none">System Date</p>
+              <h4 className="text-2xl font-black italic tracking-tighter leading-none uppercase">{format(new Date(), 'MMM dd, yyyy')}</h4>
+            </div>
+            <div className="flex bg-slate-50 rounded-[1.5rem] p-1.5 shadow-sm border border-slate-100">
+              {(['day', 'week', 'month'] as const).map((t) => (
+                <button 
+                  key={t} 
+                  onClick={() => setViewType(t)} 
+                  className={`px-6 py-3 rounded-xl font-black text-[9px] uppercase italic transition-all ${viewType === t ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white rounded-[3rem] p-8 shadow-xl border border-slate-100 text-center max-w-4xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-8 px-4">
-            <h2 className="text-2xl font-black uppercase italic text-slate-800 tracking-tighter">{monthFull}</h2>
+        {/* CALENDAR INTERFACE - UPGRADED AESTHETIC */}
+        <div className="bg-white rounded-[3.5rem] p-10 shadow-2xl border-2 border-slate-50 text-center mx-auto relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-2 h-full bg-slate-900 transition-all duration-500 group-hover:bg-emerald-500" />
+          
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-8 mb-12 px-6">
             <div className="flex items-center gap-6">
-              <div className="flex bg-slate-100 p-1 rounded-2xl">
-                {(['day', 'week', 'month'] as const).map((t) => (
-                  <button key={t} onClick={() => setViewType(t)} className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase transition-all ${viewType === t ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'month' ? 'Monthly' : t === 'day' ? 'Daily' : 'Weekly'}</button>
-                ))}
+              <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-lg">
+                <Calendar size={24} />
               </div>
-              <div className="flex gap-2">
-                <button onClick={handlePrev} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-emerald-600 transition-colors"><ChevronLeft size={20}/></button>
-                <button onClick={handleNext} className="p-2 bg-slate-50 rounded-full text-slate-400 hover:text-emerald-600 transition-colors"><ChevronRight size={20}/></button>
-              </div>
+              <h2 className="text-4xl font-black uppercase italic text-slate-900 tracking-tighter">{monthFull}</h2>
+            </div>
+            
+            <div className="flex gap-3">
+              <button onClick={handlePrev} className="p-4 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200"><ChevronLeft size={24}/></button>
+              <button onClick={handleNext} className="p-4 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200"><ChevronRight size={24}/></button>
             </div>
           </div>
 
           {viewType !== 'day' && (
-            <div className="grid grid-cols-7 gap-3 mb-4">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
-                <div key={idx} className="text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">{day}</div>
+            <div className="grid grid-cols-7 gap-4 mb-6 px-4">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+                <div key={idx} className="text-center text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] italic">{day}</div>
               ))}
             </div>
           )}
 
-          <div className={`grid ${viewType === 'day' ? 'grid-cols-1 max-w-xs mx-auto' : 'grid-cols-7'} gap-3`}>
+          <div className={`grid ${viewType === 'day' ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-7'} gap-4 px-4 pb-4`}>
             {calendarDays.map((date, i) => {
-              if (!date) return <div key={`empty-${i}`} className="h-14" />;
+              if (!date) return <div key={`empty-${i}`} className="h-20" />;
               const dayNum = date.getDate();
               const isSelected = isSameDay(date, new Date(viewDate.getFullYear(), viewDate.getMonth(), selectedDay));
+              const isToday = isSameDay(date, new Date());
               const dSummary = getDayOccupancySummary(jobs, date, userEmail || undefined).get(dayNum) || { count: 0, unassigned: 0 };
+              
               return (
-                <button key={i} onClick={() => { setViewDate(date); setSelectedDay(dayNum); }} className={`relative h-14 rounded-2xl font-black text-lg transition-all flex flex-col items-center justify-center ${isSelected ? 'bg-emerald-600 text-white scale-105 shadow-lg' : 'text-slate-800 hover:bg-slate-50'} ${dSummary.count > 0 ? 'border-2 border-emerald-500' : ''}`}>
+                <button 
+                  key={i} 
+                  onClick={() => { setViewDate(date); setSelectedDay(dayNum); }} 
+                  className={`relative h-24 rounded-[2rem] font-black text-2xl transition-all duration-500 flex flex-col items-center justify-center border-2 group
+                    ${isSelected ? 'bg-slate-900 text-white scale-105 shadow-2xl border-slate-900 z-10' : 
+                      isToday ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                      dSummary.count > 0 ? 'bg-white text-slate-900 border-slate-100 hover:border-slate-900' : 
+                      'bg-white text-slate-300 border-transparent hover:border-slate-100'}`}
+                >
                   {dayNum}
-                  {viewType === 'day' && <span className="text-[9px] uppercase tracking-widest mt-1 opacity-60">{format(date, 'EEEE')}</span>}
-                  <div className="flex gap-0.5 absolute bottom-2">
-                    {Array.from({ length: Math.min(dSummary.count, 3) }).map((_, dotIdx) => (
-                      <span key={dotIdx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></span>
-                    ))}
-                  </div>
+                  {viewType === 'day' && <span className="text-[10px] uppercase tracking-[0.2em] mt-2 opacity-60 font-bold">{format(date, 'EEEE')}</span>}
+                  
+                  {dSummary.count > 0 && (
+                    <div className="flex gap-1 absolute bottom-4">
+                      {Array.from({ length: Math.min(dSummary.count, 3) }).map((_, dotIdx) => (
+                        <span key={dotIdx} className={`w-1.5 h-1.5 rounded-full transition-colors duration-500 ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></span>
+                      ))}
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
 
-        <div className="space-y-10">
-          {filteredJobs.length > 0 ? filteredJobs.map((job, idx) => (
-            <JobCard key={`${job.id}-${idx}`} job={job} isAdmin={false} setCompletingJob={setCompletingLead} userEmail={userEmail} unlockedJobs={unlockedJobs} toggleLock={toggleLock} updateJob={updateJob} isUpdating={isUpdating} currentDayTime={startOfDay(new Date(viewDate.getFullYear(), viewDate.getMonth(), selectedDay)).getTime()} />
-          )) : (
-            <div className="text-center py-24 bg-white rounded-[4rem] border-2 border-dashed border-slate-100">
-              <p className="text-slate-300 font-black uppercase tracking-widest italic text-2xl">No Missions Assigned Today</p>
+        {/* MISSIONS LIST */}
+        <div className="space-y-10 pt-8">
+          <div className="flex items-center justify-between px-8">
+            <div className="flex items-center gap-4">
+              <Activity size={14} className="text-slate-300" />
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] italic">Daily Assignments</p>
             </div>
-          )}
+            <div className="bg-slate-50 px-5 py-2 rounded-xl text-[10px] font-black text-slate-400 uppercase italic tracking-widest">
+              {filteredJobs.length} Operations Detected
+            </div>
+          </div>
+
+          <div className="grid gap-6">
+            {filteredJobs.length > 0 ? filteredJobs.map((job, idx) => (
+              <div key={`${job.id}-${idx}`} className="animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                <JobCard 
+                  job={job} 
+                  isAdmin={false} 
+                  setCompletingJob={setCompletingLead} 
+                  userEmail={userEmail} 
+                  unlockedJobs={unlockedJobs} 
+                  toggleLock={toggleLock} 
+                  updateJob={updateJob} 
+                  isUpdating={isUpdating} 
+                  currentDayTime={startOfDay(new Date(viewDate.getFullYear(), viewDate.getMonth(), selectedDay)).getTime()} 
+                />
+              </div>
+            )) : (
+              <div className="text-center py-32 bg-slate-50 rounded-[4rem] border-2 border-dashed border-slate-100 flex flex-col items-center gap-6">
+                <div className="p-6 bg-white rounded-3xl shadow-sm text-slate-100">
+                  <Zap size={48} />
+                </div>
+                <p className="text-slate-300 font-black uppercase tracking-[0.2em] italic text-2xl">No Missions assigned for this sector</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* CONFIRMATION MODAL - MATCHING ADMIN */}
       {completingLead && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-6 text-center">
-          <div className="bg-white w-full max-w-lg rounded-[3rem] p-12 relative shadow-2xl animate-in zoom-in duration-300">
-            <div className="mb-10"><h2 className="text-5xl font-black uppercase italic text-slate-900 mb-2 leading-none tracking-tighter">Confirmation</h2></div>
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-6 text-center">
+          <div className="bg-white w-full max-w-lg rounded-[3.5rem] p-12 relative shadow-2xl animate-in zoom-in-95 duration-300 border border-slate-100">
+            <div className="mb-12 border-b-4 border-slate-900 pb-8">
+              <h2 className="text-5xl font-black uppercase italic text-slate-900 tracking-tighter leading-none mb-4">Confirm <br/><span className="text-slate-200">Completion.</span></h2>
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.4em] italic leading-none">Mission Finalization Terminal</p>
+            </div>
             
             {paymentStep === 'method' && (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 <div className="grid gap-5">
-                  <button onClick={() => setPaymentStep('card_manual')} className="flex items-center justify-between p-8 bg-slate-900 text-white rounded-3xl hover:bg-emerald-600 transition-all group shadow-xl">
-                    <div className="flex items-center gap-5">
-                      <CreditCard size={32} className="text-emerald-400 group-hover:text-white" />
-                      <div className="text-left"><span className="block font-black uppercase italic text-xl leading-none">Pay with Card</span><span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 group-hover:text-emerald-100">Secure Stripe Payment</span></div>
+                  <button onClick={() => setPaymentStep('card_manual')} className="flex items-center justify-between p-8 bg-slate-900 text-white rounded-[2rem] hover:bg-black transition-all group shadow-2xl">
+                    <div className="flex items-center gap-6">
+                      <div className="bg-white/10 p-3 rounded-xl">
+                        <CreditCard size={32} className="text-blue-400" />
+                      </div>
+                      <div className="text-left">
+                        <span className="block font-black uppercase italic text-2xl leading-none tracking-tighter">Pay with Card</span>
+                        <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2 group-hover:text-blue-300 transition-colors">Secure Stripe Payment</span>
+                      </div>
                     </div>
+                    <ArrowRight size={24} className="text-slate-700 group-hover:text-white transition-all" />
                   </button>
                   <div className="grid grid-cols-2 gap-5">
-                    <button onClick={() => setPaymentStep('cash_details')} className="flex flex-col items-center p-8 bg-slate-50 rounded-3xl hover:bg-emerald-50 hover:text-emerald-600 transition-all group gap-3 border-2 border-transparent hover:border-emerald-100"><Banknote size={28} className="text-slate-400 group-hover:text-emerald-500" /><span className="font-black uppercase italic text-[9px] tracking-widest">Cash</span></button>
-                    <button onClick={() => setPaymentStep('check_details')} className="flex flex-col items-center p-8 bg-slate-50 rounded-3xl hover:bg-emerald-50 hover:text-emerald-600 transition-all group gap-3 border-2 border-transparent hover:border-emerald-100"><Receipt size={28} className="text-slate-400 group-hover:text-emerald-500" /><span className="font-black uppercase italic text-[9px] tracking-widest">Check</span></button>
+                    <button onClick={() => setPaymentStep('cash_details')} className="flex flex-col items-center p-8 bg-slate-50 rounded-[2rem] hover:bg-slate-100 transition-all group gap-4 border-2 border-transparent hover:border-slate-200 shadow-sm">
+                      <div className="bg-white p-4 rounded-2xl shadow-sm text-slate-400 group-hover:text-emerald-500 transition-all"><Banknote size={32} /></div>
+                      <span className="font-black uppercase italic text-[10px] tracking-widest text-slate-400 group-hover:text-slate-900">Cash Payment</span>
+                    </button>
+                    <button onClick={() => setPaymentStep('check_details')} className="flex flex-col items-center p-8 bg-slate-50 rounded-[2rem] hover:bg-slate-100 transition-all group gap-4 border-2 border-transparent hover:border-slate-200 shadow-sm">
+                      <div className="bg-white p-4 rounded-2xl shadow-sm text-slate-400 group-hover:text-blue-500 transition-all"><Receipt size={32} /></div>
+                      <span className="font-black uppercase italic text-[10px] tracking-widest text-slate-400 group-hover:text-slate-900">Check Payment</span>
+                    </button>
                   </div>
                 </div>
-                <button onClick={() => setCompletingLead(null)} className="w-full py-4 text-[9px] font-black uppercase tracking-widest text-slate-300 hover:text-slate-900 transition-colors">Return to Missions</button>
+                <button onClick={() => setCompletingLead(null)} className="w-full py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 hover:text-slate-900 transition-colors italic">Abort Finalization</button>
               </div>
             )}
 
+            {/* PAYMENT STEP UI UPDATED TO MATCH ADMIN PREMIUM STYLE */}
             {paymentStep === 'card_manual' && (
-              <div className="space-y-8">
-                <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 text-center">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Amount to Charge Card</p>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    value={receivedAmount} 
-                    onChange={(e) => setReceivedAmount(e.target.value)} 
-                    className="w-full bg-white border-2 border-slate-100 rounded-2xl py-6 px-8 text-4xl font-black text-slate-900 outline-none focus:border-emerald-600 transition-all text-center [appearance:textfield]" 
-                    autoFocus 
-                  />
-                  <div className="mt-6 flex justify-between items-center px-4">
-                    <div className="text-left">
-                      <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic">Original Bill</p>
-                      <p className="text-xl font-black text-slate-400">${completingLead?.total || completingLead?.finalPrice || '0'}</p>
+              <div className="space-y-10">
+                <div className="bg-slate-50 p-10 rounded-[2.5rem] border-2 border-slate-100 text-center shadow-inner relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 italic">Amount to Charge Card</p>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-black text-3xl">$</span>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={receivedAmount} 
+                      onChange={(e) => setReceivedAmount(e.target.value)} 
+                      className="w-full bg-white border-2 border-slate-100 rounded-3xl py-8 px-12 text-5xl font-black text-slate-900 outline-none focus:border-slate-900 transition-all text-center [appearance:textfield] shadow-sm" 
+                      autoFocus 
+                    />
+                  </div>
+                  <div className="mt-8 grid grid-cols-2 gap-6 px-4">
+                    <div className="text-left border-r border-slate-200">
+                      <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic mb-1">Bill Total</p>
+                      <p className="text-2xl font-black text-slate-400 tracking-tighter leading-none">${completingLead?.total || completingLead?.finalPrice || '0'}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest italic">Optional Tip</p>
-                      <p className="text-2xl font-black text-emerald-600 italic leading-none">
+                      <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest italic mb-1">Crew Tip</p>
+                      <p className="text-3xl font-black text-emerald-600 tracking-tighter leading-none">
                         ${Math.max(0, (parseFloat(receivedAmount) || 0) - (parseFloat(completingLead?.total || completingLead?.finalPrice || '0'))).toFixed(2)}
                       </p>
                     </div>
                   </div>
-                  <div className="mt-6 pt-6 border-t border-slate-100">
-                    <p className="text-[10px] font-black text-emerald-600 uppercase italic tracking-widest">
-                      100% of tips go directly to your technician!
-                    </p>
-                  </div>
                 </div>
                 <div className="flex gap-4">
-                  <button onClick={() => setPaymentStep('method')} className="px-8 py-6 bg-slate-100 rounded-2xl font-black uppercase italic text-[10px] tracking-widest text-slate-400 hover:bg-slate-200 transition-all">Back</button>
+                  <button onClick={() => setPaymentStep('method')} className="px-8 py-6 bg-slate-100 rounded-2xl font-black uppercase italic text-[10px] tracking-widest text-slate-400 hover:bg-slate-200 transition-all border border-transparent">Back</button>
                   <button 
                     disabled={isProcessingStripe || (parseFloat(receivedAmount) || 0) < (parseFloat(completingLead?.total || completingLead?.finalPrice || '0'))} 
                     onClick={initiateStripeCheckout} 
-                    className={`flex-1 py-6 rounded-3xl font-black uppercase italic text-sm tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 
+                    className={`flex-1 py-6 rounded-[2rem] font-black uppercase italic text-xs tracking-widest shadow-2xl transition-all flex items-center justify-center gap-4
                       ${(parseFloat(receivedAmount) || 0) < (parseFloat(completingLead?.total || completingLead?.finalPrice || '0')) 
-                        ? 'bg-slate-100 text-slate-300 cursor-not-allowed' 
-                        : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
+                        ? 'bg-slate-50 text-slate-200 cursor-not-allowed border-2 border-dashed border-slate-100' 
+                        : 'bg-slate-900 text-white hover:bg-black'}`}
                   >
-                    {isProcessingStripe ? <Loader2 size={20} className="animate-spin" /> : <CreditCard size={20} />}
-                    {isProcessingStripe ? 'Opening Stripe...' : (parseFloat(receivedAmount) || 0) < (parseFloat(completingLead?.total || completingLead?.finalPrice || '0')) ? 'Insufficient Amount' : 'Initialize Payment'}
+                    {isProcessingStripe ? <Loader2 size={20} className="animate-spin" /> : <CreditCard size={20} className="text-blue-400" />}
+                    {isProcessingStripe ? 'Opening Secure Portal...' : (parseFloat(receivedAmount) || 0) < (parseFloat(completingLead?.total || completingLead?.finalPrice || '0')) ? 'Insufficient Funds' : 'Initialize Stripe Pay'}
                   </button>
                 </div>
               </div>
             )}
 
             {paymentStep === 'cash_details' && (
-              <div className="space-y-8">
-                <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 text-center">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Total Cash Received</p>
-                  <input type="number" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-2xl py-6 px-8 text-4xl font-black text-slate-900 outline-none focus:border-emerald-600 transition-all text-center [appearance:textfield]" autoFocus />
-                  <div className="mt-6 flex justify-between items-center px-4">
-                    <div className="text-left"><p className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic">Bill Balance</p><p className="text-xl font-black text-slate-400">${completingLead?.total || completingLead?.finalPrice || '0'}</p></div>
-                    <div className="text-right"><p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest italic">Calculated Tip</p><p className="text-2xl font-black text-emerald-600 italic leading-none">${Math.max(0, (parseFloat(receivedAmount) || 0) - (parseFloat(completingLead?.total || completingLead?.finalPrice || '0'))).toFixed(2)}</p></div>
+              <div className="space-y-10">
+                <div className="bg-slate-50 p-10 rounded-[2.5rem] border-2 border-slate-100 text-center shadow-inner relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500" />
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 italic">Total Cash Collected</p>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-black text-3xl">$</span>
+                    <input type="number" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-3xl py-8 px-12 text-5xl font-black text-slate-900 outline-none focus:border-slate-900 transition-all text-center [appearance:textfield] shadow-sm" autoFocus />
+                  </div>
+                  <div className="mt-8 grid grid-cols-2 gap-6 px-4">
+                    <div className="text-left border-r border-slate-200">
+                      <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic mb-1">Service Fee</p>
+                      <p className="text-2xl font-black text-slate-400 tracking-tighter leading-none">${completingLead?.total || completingLead?.finalPrice || '0'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest italic mb-1">Crew Tip</p>
+                      <p className="text-3xl font-black text-emerald-600 tracking-tighter leading-none">${Math.max(0, (parseFloat(receivedAmount) || 0) - (parseFloat(completingLead?.total || completingLead?.finalPrice || '0'))).toFixed(2)}</p>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-4">
-                  <button onClick={() => setPaymentStep('method')} className="px-8 py-6 bg-slate-100 rounded-2xl font-black uppercase italic text-[10px] tracking-widest text-slate-400 hover:bg-slate-200 transition-all">Back</button>
-                  <button onClick={() => handleJobCompletion('Cash')} className="flex-1 py-6 bg-slate-900 text-white rounded-3xl font-black uppercase italic text-sm tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-3">Complete Mission <ArrowRight size={18} /></button>
+                  <button onClick={() => setPaymentStep('method')} className="px-8 py-6 bg-slate-100 rounded-2xl font-black uppercase italic text-[10px] tracking-widest text-slate-400 hover:bg-slate-200 transition-all border border-transparent">Back</button>
+                  <button onClick={() => handleJobCompletion('Cash')} className="flex-1 py-6 bg-slate-900 text-white rounded-[2rem] font-black uppercase italic text-xs tracking-widest shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-4">Finalize Mission <ArrowRight size={20} /></button>
                 </div>
               </div>
             )}
 
             {paymentStep === 'check_details' && (
-              <div className="space-y-6">
-                <div className="grid gap-4">
-                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2 italic">Check Number</p>
-                    <input type="text" placeholder="XXXX" value={checkNumber} onChange={(e) => setCheckNumber(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-2xl py-4 px-6 text-xl font-black text-slate-900 outline-none focus:border-emerald-600 transition-all" autoFocus />
+              <div className="space-y-8 text-left">
+                <div className="grid gap-6">
+                  <div className="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-inner">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4 italic ml-2">Verification #</p>
+                    <input type="text" placeholder="CHECK NUMBER" value={checkNumber} onChange={(e) => setCheckNumber(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-2xl py-5 px-8 text-2xl font-black text-slate-900 outline-none focus:border-slate-900 transition-all shadow-sm" autoFocus />
                   </div>
-                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2 italic">Amount on Check</p>
-                    <input type="number" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-2xl py-4 px-6 text-xl font-black text-slate-900 outline-none focus:border-emerald-600 transition-all [appearance:textfield]" />
+                  <div className="bg-slate-50 p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-inner">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4 italic ml-2">Check Amount</p>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-black text-2xl">$</span>
+                      <input type="number" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-2xl py-5 px-10 text-3xl font-black text-slate-900 outline-none focus:border-slate-900 transition-all [appearance:textfield] shadow-sm" />
+                    </div>
                   </div>
                 </div>
                 
-                <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] font-black text-emerald-600 uppercase italic tracking-widest">Optional Tip</p>
-                    <p className="text-2xl font-black text-emerald-600 italic">
+                <div className="bg-emerald-50/50 p-8 rounded-[2rem] border-2 border-emerald-100/50 flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] font-black text-emerald-600 uppercase italic tracking-widest mb-1">Bonus Gratuity</p>
+                    <p className="text-3xl font-black text-emerald-600 italic tracking-tighter leading-none">
                       ${Math.max(0, (parseFloat(receivedAmount) || 0) - (parseFloat(completingLead?.total || completingLead?.finalPrice || '0'))).toFixed(2)}
                     </p>
                   </div>
+                  <div className="p-4 bg-white rounded-2xl shadow-sm text-emerald-500">
+                    <Zap size={24} />
+                  </div>
                 </div>
 
-                <div className="flex gap-4">
-                  <button onClick={() => setPaymentStep('method')} className="px-8 py-6 bg-slate-100 rounded-2xl font-black uppercase italic text-[10px] tracking-widest text-slate-400 hover:bg-slate-200 transition-all">Back</button>
-                  <button onClick={() => handleJobCompletion('Check')} className="flex-1 py-6 bg-slate-900 text-white rounded-3xl font-black uppercase italic text-sm tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-4">Submit Check <ArrowRight size={18} /></button>
+                <div className="flex gap-4 pt-4">
+                  <button onClick={() => setPaymentStep('method')} className="px-8 py-6 bg-slate-100 rounded-2xl font-black uppercase italic text-[10px] tracking-widest text-slate-400 hover:bg-slate-200 transition-all border border-transparent">Back</button>
+                  <button onClick={() => handleJobCompletion('Check')} className="flex-1 py-6 bg-slate-900 text-white rounded-[2rem] font-black uppercase italic text-xs tracking-widest shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-4">Transmit Check <ArrowRight size={20} /></button>
                 </div>
               </div>
             )}

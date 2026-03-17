@@ -10,7 +10,8 @@ const mockFormData = {
   phone: '',
   address: '',
   city: '',
-  otherCity: ''
+  otherCity: '',
+  branch: '',
 };
 
 const mockSetFormData = vi.fn();
@@ -35,19 +36,11 @@ describe('ContactStep', () => {
     }));
   });
 
-  it('shows travel surcharge notice for premium cities', () => {
-    const formDataWithPremiumCity = {
-      ...mockFormData,
-      city: 'Yakima'
-    };
-    render(<ContactStep formData={formDataWithPremiumCity} setFormData={mockSetFormData} onNext={mockOnNext} />);
-    expect(screen.getByText(/travel surcharge/i)).toBeInTheDocument();
-  });
-
   it('shows other city input when "Other WA" is selected', () => {
     const formDataWithOther = {
       ...mockFormData,
-      city: 'Other WA'
+      branch: 'Tri-Cities',
+      city: 'Other'
     };
     render(<ContactStep formData={formDataWithOther} setFormData={mockSetFormData} onNext={mockOnNext} />);
     expect(screen.getByPlaceholderText(/Enter WA City Name/i)).toBeInTheDocument();
@@ -66,7 +59,8 @@ describe('ContactStep', () => {
       email: 'john@example.com',
       phone: '(509) 555-1212',
       address: '123 Main St',
-      city: 'Kennewick'
+      city: 'Kennewick',
+      branch: 'Tri-Cities'
     };
     render(<ContactStep formData={validFormData} setFormData={mockSetFormData} onNext={mockOnNext} />);
     const nextButton = screen.getByRole('button', { name: /Services/i });

@@ -1,9 +1,9 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import { db } from '../../../lib/firebase';
 import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Clock, Calendar, DollarSign, Home, User, MapPin, Sparkles, Waves, Droplets, Wind, Plus, Minus, Building2, Sun, Loader2, CheckSquare } from 'lucide-react';
-import { startOfDay } from 'date-fns';
+import { startOfDay, addDays } from 'date-fns';
 
 const BRANCHES = ['Tri-Cities', 'Walla Walla', 'Tacoma', 'Puyallup'];
 const CITIES = [
@@ -40,7 +40,8 @@ export default function ManualBooking() {
     mossAcidWash: false,
     sidingCleaning: false,
     trexWash: false,
-    trexDeckSize: 'none',
+    trexDeckSize: 'none
+    ',
     cedarFenceRestoration: false,
     fenceSize: 'none',
     backPatio: false,
@@ -67,12 +68,32 @@ export default function ManualBooking() {
     }));
   };
 
+  const getMinBookingDate = () => {
+    const today = new Date();
+    const april1st = new Date(today.getFullYear(), 3, 1); // April 1st of current year (month is 0-indexed)
+    const twoWeeksFromNow = addDays(today, 14);
+
+    // The earliest selectable date is either April 1st OR two weeks from now, whichever is LATER.
+    const minDate = today < april1st ? april1st : twoWeeksFromNow;
+
+    return minDate.toISOString().split('T')[0];
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.firstName || !formData.appointmentDate || !formData.totalAmount) {
       alert("Please fill in the required fields (Name, Date, Amount)");
       return;
     }
+
+    const selectedBookingDate = new Date(formData.appointmentDate + 'T00:00:00');
+    const minDate = new Date(getMinBookingDate() + 'T00:00:00');
+
+    if (selectedBookingDate < minDate) {
+      alert(`Bookings are not available until ${format(minDate, 'MMMM do, yyyy')}.`);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -114,8 +135,12 @@ export default function ManualBooking() {
         windowCount: 0, windowType: 'none', homeSize: '1-2', stories: 1,
         solarPanelCount: 0, gutterFlush: false, deluxeGutter: false, roofBlowOff: false,
         mossTreatment: false, mossAcidWash: false, sidingCleaning: false,
-        trexWash: false, trexDeckSize: 'none', cedarFenceRestoration: false,
-        fenceSize: 'none', backPatio: false, patioSize: 'none', drivewaySize: 'none',
+        trexWash: false, trexDeckSize: 'none',
+        cedarFenceRestoration: false,
+        fenceSize: 'none',
+        backPatio: false,
+        patioSize: 'none',
+        drivewaySize: 'none',
         militaryDiscount: false, deluxeWindow: false
       });
     } catch (error: any) {
@@ -185,7 +210,7 @@ export default function ManualBooking() {
           <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 space-y-6">
             <div className="flex items-center gap-3 text-slate-400 mb-2"><Calendar size={18} /><h3 className="text-[10px] font-black uppercase tracking-widest italic">Schedule & Pricing</h3></div>
             <div className="space-y-4">
-              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Appointment Date</label><input type="date" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold outline-none" value={formData.appointmentDate} onChange={e => setFormData({...formData, appointmentDate: e.target.value})} required /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Appointment Date</label><input type="date" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold outline-none" value={formData.appointmentDate} onChange={e => setFormData({...formData, appointmentDate: e.target.value})} min={getMinBookingDate()} required /></div>
               <div className="grid grid-cols-3 gap-2">
                 {['morning', 'midday', 'afternoon'].map(s => (
                   <button key={s} type="button" onClick={() => setFormData({...formData, timeSlot: s})} className={`py-3 rounded-xl text-[8px] font-black uppercase border-2 transition-all ${formData.timeSlot === s ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-slate-50 border-slate-50 text-slate-400'}`}>{s === 'morning' ? '8:00 AM' : s === 'midday' ? '11:30 AM' : '3:00 PM'}</button>

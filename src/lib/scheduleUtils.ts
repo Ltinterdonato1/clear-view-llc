@@ -85,7 +85,32 @@ export const calculateJobStats = (jobData: any) => {
   const srv: string[] = Array.isArray(jobData.selectedServices) ? [...jobData.selectedServices] : [];
   const windowCount = Number(jobData.windowCount) || 0;
   const homeSize = jobData.homeSize || '1-2';
-  const TAX_RATE = 0.085;
+
+  // --- DYNAMIC TAX RATE LOGIC ---
+  const getTaxRate = (city: string, branch: string) => {
+    const c = (city || '').toLowerCase();
+    const b = (branch || '').toLowerCase();
+
+    // Pierce County (Tacoma/Puyallup)
+    if (b.includes('tacoma') || b.includes('puyallup')) {
+      if (c.includes('tacoma') || c.includes('ruston')) return 0.103;
+      return 0.100; // Lakewood, Puyallup, Sumner, etc.
+    }
+    // Walla Walla County
+    if (b.includes('walla')) {
+      if (c.includes('walla') || c.includes('college')) return 0.090;
+      return 0.082;
+    }
+    // Tri-Cities (Benton/Franklin)
+    if (b.includes('tri')) {
+      if (c.includes('finley')) return 0.080;
+      if (c.includes('burbank')) return 0.082;
+      return 0.087; // Kennewick, Pasco, Richland
+    }
+    return 0.087; // Default fallback
+  };
+
+  const TAX_RATE = getTaxRate(jobData.city, jobData.branch);
 
   // --- HEIGHT SURCHARGE LOGIC ---
   const hasStandardLadderService = (
@@ -108,13 +133,14 @@ export const calculateJobStats = (jobData: any) => {
     const windowType = jobData.windowType || 'none';
     if (windowType !== 'none') {
       const rate = windowType === 'both' ? BASE_PRICES.window_both : windowType === 'interior' ? BASE_PRICES.window_int : BASE_PRICES.window_ext;
+      const typeLabel = windowType === 'both' ? 'E/I' : windowType === 'interior' ? 'INT' : 'EXT';
       let winPrice = (windowCount * rate);
       let winMins = (windowCount * (windowType === 'both' ? 9 : 5)) + 40;
       if (!ladderFeeClaimed && (windowType === 'exterior' || windowType === 'both') && ladderPrice > 0) { winPrice += ladderPrice; ladderFeeClaimed = true; }
       nonTaxableSubtotal += winPrice; coreDiscountableBase += winPrice; totalMinutes += winMins;
-      lineItems.push({ name: `Window Cleaning (${windowCount})`, price: winPrice });
+      lineItems.push({ name: `Window Cleaning ${typeLabel} (${windowCount})`, price: winPrice });
       rawServiceJobs.push({ name: 'Window Cleaning', time: winMins });
-      if (jobData.deluxeWindow) { const sPrice = windowCount * BASE_PRICES.deluxe_per_window; nonTaxableSubtotal += sPrice; totalMinutes += (windowCount * 2); lineItems.push({ name: "Screen Detail", price: sPrice }); }
+      if (jobData.deluxeWindow) { const sPrice = windowCount * BASE_PRICES.deluxe_per_window; nonTaxableSubtotal += sPrice; totalMinutes += (windowCount * 2); lineItems.push({ name: "Screen Cleaning", price: sPrice }); }
     }
     const sExt = Number(jobData.skylightCount) || 0;
     const sInt = Number(jobData.skylightInteriorCount) || 0;
@@ -122,7 +148,18 @@ export const calculateJobStats = (jobData: any) => {
     const skyPrice = (sBoth * BASE_PRICES.skylight_both) + ((sExt - sBoth) * BASE_PRICES.skylight_ext) + ((sInt - sBoth) * BASE_PRICES.skylight_int);
     if (skyPrice > 0) {
       nonTaxableSubtotal += skyPrice; const sMins = (sBoth * 15) + (Math.abs(sExt - sInt) * 10); totalMinutes += sMins;
-      lineItems.push({ name: `Skylights (${sExt + sInt})`, price: skyPrice });
+      
+      let skyLabel = 'Skylights';
+      if (sExt === sInt) {
+        skyLabel = `Skylights E/I (${sExt})`;
+      } else {
+        const parts = [];
+        if (sExt > 0) parts.push(`EXT ${sExt}`);
+        if (sInt > 0) parts.push(`INT ${sInt}`);
+        skyLabel = `Skylights: ${parts.join(' / ')}`;
+      }
+      
+      lineItems.push({ name: skyLabel, price: skyPrice });
       const existingIdx = rawServiceJobs.findIndex(j => j.name === 'Window Cleaning');
       if (existingIdx >= 0) rawServiceJobs[existingIdx].time += sMins; else rawServiceJobs.push({ name: 'Skylights', time: sMins });
     }
@@ -198,11 +235,11 @@ export const calculateJobStats = (jobData: any) => {
       lineItems.push({ name: "Baking Soda Moss Out", price: mossPrice });
     }
     if (jobData.mossAcidWash) {
-      let acidPrice = homeSize === '5+' ? BASE_PRICES.moss_acid_wash_5 : homeSize === '3-4' ? BASE_PRICES.moss_acid_wash_3_4 : BASE_PRICES.moss_acid_wash_1_2;
+      let acidPrice = homeSize === '5+' ? BASE_PRICES.roof_blowoff_5 : homeSize === '3-4' ? BASE_PRICES.roof_blowoff_3_4 : BASE_PRICES.roof_blowoff_1_2;
       const aMins = 60;
       if (!ladderFeeClaimed && ladderPrice > 0) { acidPrice += ladderPrice; ladderFeeClaimed = true; }
       taxableSubtotal += acidPrice; rcMins += aMins;
-      lineItems.push({ name: "Acid Wash Moss Removal", price: acidPrice });
+      lineItems.push({ name: "Light Acid Wash", price: acidPrice });
     }
     if (rcMins > 0) { totalMinutes += rcMins; rawServiceJobs.push({ name: 'Roof Cleaning', time: rcMins }); }
   }
@@ -267,10 +304,14 @@ export const calculateJobStats = (jobData: any) => {
   const taxablePortion = finalTotalBeforeTax * taxableRatio;
   
   const tax = taxablePortion * TAX_RATE;
-  if (tax > 0) lineItems.push({ name: `Sales Tax (8.5% on Taxable Services)`, price: tax });
+  if (tax > 0) lineItems.push({ name: `Sales Tax (${(TAX_RATE * 100).toFixed(1)}% on Taxable Services)`, price: tax });
   
   let finalTotal = finalTotalBeforeTax + tax;
-  if (srv.length > 0 && finalTotal < BASE_PRICES.MINIMUM_SERVICE_FEE) finalTotal = BASE_PRICES.MINIMUM_SERVICE_FEE;
+  if (srv.length > 0 && finalTotal < BASE_PRICES.MINIMUM_SERVICE_FEE) {
+    const diff = BASE_PRICES.MINIMUM_SERVICE_FEE - finalTotal;
+    lineItems.push({ name: "Minimum Service Adjustment", price: diff });
+    finalTotal = BASE_PRICES.MINIMUM_SERVICE_FEE;
+  }
   
   if (jobData.hasEarnedReferralReward) { const reward = finalTotal * 0.10; finalTotal -= reward; discounts.push({ name: "Referral Reward (10%)", amount: reward }); }
   if (jobData.militaryDiscount) { const mil = finalTotal * 0.10; finalTotal -= mil; discounts.push({ name: "Military Discount (10%)", amount: mil }); }
@@ -278,9 +319,18 @@ export const calculateJobStats = (jobData: any) => {
   return { 
     total: finalTotal.toFixed(2), timeDisplay: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
     srv, lineItems, serviceJobs, discounts, totalMinutes, bundleSavings: bundleSavings.toFixed(2), manualCredit: referralCredit.toFixed(2),
-    savings: (bundleSavings + referralCredit + (jobData.militaryDiscount ? finalTotal * 0.11 : 0)).toFixed(2),
+    savings: (bundleSavings + referralCredit + (jobData.militaryDiscount ? finalTotal * 0.10 : 0)).toFixed(2),
+    discountRate: (coreDiscountRate * 100).toFixed(0),
     daysRequired: Math.ceil(totalMinutes / 540), referralBonus: ((totalBase - bundleSavings) * 0.10).toFixed(2)
   };
+};
+
+const getSafeDate = (d: any): Date | null => {
+  if (!d) return null;
+  if (typeof d.toDate === 'function') return d.toDate();
+  if (d.seconds !== undefined) return new Date(d.seconds * 1000);
+  const parsed = new Date(d);
+  return isNaN(parsed.getTime()) ? null : parsed;
 };
 
 export const getDayOccupancySummary = (jobs: any[], viewDate: Date, userEmail?: string) => {
@@ -289,7 +339,16 @@ export const getDayOccupancySummary = (jobs: any[], viewDate: Date, userEmail?: 
   jobs.forEach(job => {
     if (job.isNotification) return;
     if (userEmail && !isAdmin && job.assignedTo !== userEmail) return;
-    const bookedDates = (job.actualBookedDays || []).map((ts: any) => typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts)) as Date[];
+    
+    const bookedDates = (job.actualBookedDays || []).map((ts: any) => getSafeDate(ts))
+      .filter((d: Date | null): d is Date => d !== null);
+    
+    // If actualBookedDays is empty, fallback to selectedDate
+    if (bookedDates.length === 0 && job.selectedDate) {
+      const d = getSafeDate(job.selectedDate);
+      if (d) bookedDates.push(d);
+    }
+
     bookedDates.forEach((d: Date) => {
       const normalized = startOfDay(d);
       if (normalized.getMonth() === viewDate.getMonth() && normalized.getFullYear() === viewDate.getFullYear()) {
@@ -305,11 +364,30 @@ export const getDayOccupancySummary = (jobs: any[], viewDate: Date, userEmail?: 
 export const filterJobsBySelectedDay = (jobs: any[], viewDate: Date, selectedDay: number, userEmail?: string) => {
   const selectedDateObj = new Date(viewDate.getFullYear(), viewDate.getMonth(), selectedDay);
   const isAdmin = userEmail === 'clearview3cleaners@gmail.com' || !userEmail;
-  return jobs.filter(j => {
-    if (j.isNotification) return false;
-    const bookedDates = (j.actualBookedDays || []).map((ts: any) => typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts)) as Date[];
+  
+  // Use a Map to ensure each job is only included once in the result for the selected day
+  const uniqueJobs = new Map<string, any>();
+
+  jobs.forEach(j => {
+    if (j.isNotification) return;
+    
+    const bookedDates = (j.actualBookedDays || []).map((ts: any) => getSafeDate(ts))
+      .filter((d: Date | null): d is Date => d !== null);
+
+    if (bookedDates.length === 0 && j.selectedDate) {
+      const d = getSafeDate(j.selectedDate);
+      if (d) bookedDates.push(d);
+    }
+
     const isOnSelectedDay = bookedDates.some((d: Date) => startOfDay(d).getTime() === startOfDay(selectedDateObj).getTime());
-    if (!isOnSelectedDay) return false;
-    return isAdmin ? true : j.assignedTo === userEmail;
+    
+    if (isOnSelectedDay) {
+      const canSee = isAdmin ? true : j.assignedTo === userEmail;
+      if (canSee) {
+        uniqueJobs.set(j.id, j);
+      }
+    }
   });
+
+  return Array.from(uniqueJobs.values());
 };

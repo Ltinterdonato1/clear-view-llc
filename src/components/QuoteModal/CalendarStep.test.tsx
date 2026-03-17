@@ -84,7 +84,7 @@ describe('CalendarStep', () => {
         onBack={vi.fn()}
       />
     );
-    expect(screen.getByText(/Single Day/i)).toBeInTheDocument();
+    expect(screen.getByText(/Single/i)).toBeInTheDocument();
   });
 
   it('forces split mode for jobs > 9 hours', async () => {

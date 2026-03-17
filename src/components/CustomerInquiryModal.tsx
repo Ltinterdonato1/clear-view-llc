@@ -80,7 +80,7 @@ export default function CustomerInquiryModal({
           {isSuccess ? (
             <div className="text-center">
               <h2 className="text-3xl font-black uppercase italic text-emerald-600 mb-4">
-                {mode === 'referral' ? 'Referral Saved!' : 'Customer Saved!'}
+                Customer Saved!
               </h2>
               <p className="text-slate-700 mb-8">Information has been successfully saved.</p>
               <button onClick={handleCloseModal} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase italic tracking-widest hover:bg-emerald-700 transition-all">Done</button>
@@ -88,7 +88,7 @@ export default function CustomerInquiryModal({
           ) : (
             <>
               <h2 className="text-3xl font-black uppercase italic text-slate-800 mb-8">
-                {mode === 'referral' ? 'New Referral' : 'New Customer'}
+                New Customer
               </h2>
               <div className="space-y-6">
                 <input 
@@ -144,7 +144,7 @@ export default function CustomerInquiryModal({
                   disabled={isSubmitting}
                   className="w-full bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase italic tracking-widest hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? 'Saving...' : 'Save Entry'}
+                  {isSubmitting ? 'Saving...' : 'Add'}
                 </button>
               </div>
             </>

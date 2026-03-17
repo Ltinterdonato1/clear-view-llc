@@ -35,7 +35,7 @@ describe('scheduleUtils', () => {
       };
       
       const stats = calculateJobStats(jobData);
-      // 10 windows * 8 (ext) = 80. Minimum charge is 175.
+      // 10 windows * 8 (ext) = 80. Minimum service fee is 175.
       expect(stats.total).toBe('175.00');
     });
 
@@ -45,24 +45,24 @@ describe('scheduleUtils', () => {
         windowCount: 20,
         windowType: 'both', // 14 per window
         stories: 1,
-        homeSize: '1-2', // gutter base 150
-        drivewaySize: '1-2', // pressure base 175
+        homeSize: '1-2', // gutter base 175
+        drivewaySize: '1-2', // pressure base 125
       };
 
-      // subtotal (windows) = 20 * 14 = 280
-      // taxableAmount (gutters + pressure) = 150 + 175 = 325
-      // Combined = 280 + 325 = 605
-      // Discount (3 services = 20%) = 605 * 0.20 = 121
-      // Before tax total = 605 - 121 = 484
-      // Tax (8.5% on taxableAmount after discount?) 
-      // Note: Logic in calculateJobStats: 
-      // const finalTotal = Math.max((combinedBeforeDiscount * (1 - discountRate)) + (taxableAmount * TAX_RATE), srv.length > 0 ? BASE_PRICES.MINIMUM_CHARGE : 0);
-      // finalTotal = (605 * 0.8) + (325 * 0.085) = 484 + 27.625 = 511.625
+      // nonTaxableSubtotal (windows) = 20 * 14 = 280
+      // taxableSubtotal (gutters + pressure) = 175 + 125 = 300
+      // totalBase = 280 + 300 = 580
+      // Discount (3 services = 20%) = 580 * 0.20 = 116
+      // finalTotalBeforeTax = 580 - 116 = 464
+      // Assuming default TAX_RATE = 0.087
+      // taxablePortion = 464 * (300 / 580) = 240
+      // tax = 240 * 0.087 = 20.88
+      // finalTotal = 464 + 20.88 = 484.88
       
       const stats = calculateJobStats(jobData);
-      expect(stats.total).toBe('511.63');
+      expect(stats.total).toBe('484.88');
       expect(stats.discountRate).toBe('20');
-      expect(stats.savings).toBe('121.00');
+      expect(stats.savings).toBe('116.00');
     });
 
     it('should respect minimum charge', () => {

@@ -4,8 +4,8 @@ import { doc, Timestamp, collection, addDoc, serverTimestamp, updateDoc } from '
 import { db, functions } from '../../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import {
-  MapPin, Clock, CheckSquare, Mail, Lock, Unlock, ArrowRight, X,
-  UserPlus, UserCheck, Activity, Smartphone, Sparkles, Waves, Droplets, Trash2, RefreshCw, Loader2, Info, Sun, Edit2, ChevronUp, ChevronDown
+  MapPin, Clock, CheckSquare, Mail, Lock, Unlock, ArrowRight, X, Building2,
+  UserPlus, UserCheck, Activity, Smartphone, Sparkles, Waves, Droplets, Trash2, RefreshCw, Loader2, Info, Sun, Edit2, ChevronUp, ChevronDown, Wind, HandCoins, ShieldCheck, Check
 } from 'lucide-react';
 import { normalizeSlot, calculateJobStats, TIME_SLOT_MAP } from '../../lib/scheduleUtils';
 import { startOfDay, format, isValid } from 'date-fns';
@@ -42,7 +42,17 @@ const JobCard: React.FC<JobCardProps> = ({
 }) => {
   const mStats = calculateJobStats(job);
   const isUnlocked = unlockedJobs.has(job.id);
-  const assignedMember = allEmployees.find(e => e.id === job.assignedTo);
+  const lauren = { id: 'Lauren_Interdonato', name: 'Lauren Interdonato', status: 'clocked_in', isOffDuty: false };
+  
+  const allTechs = useMemo(() => {
+    const list = [...allEmployees];
+    if (!list.some(e => e.id === lauren.id || e.name === lauren.name)) {
+      list.unshift(lauren);
+    }
+    return list;
+  }, [allEmployees]);
+
+  const assignedMember = allTechs.find(e => e.id === job.assignedTo);
   
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const assignRef = useRef<HTMLDivElement>(null);
@@ -95,7 +105,7 @@ const JobCard: React.FC<JobCardProps> = ({
         <a href="${data.url}" style="background-color: #0284c7; color: white; padding: 18px 40px; text-decoration: none; border-radius: 12px; font-weight: 800; text-transform: uppercase; font-size: 14px; display: inline-block;">Pay Invoice Securely</a>
       </div>` : '';
 
-    return `<!DOCTYPE html><html><body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; background-color: #f1f5f9; margin: 0; padding: 40px 20px;"><div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 32px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);"><div style="background: #0f172a; padding: 60px 40px; text-align: center;"><div style="display: inline-block; padding: 12px 24px; border: 1px solid #334155; border-radius: 100px; margin-bottom: 24px;"><span style="color: #38bdf8; font-size: 10px; font-weight: 900; letter-spacing: 4px; text-transform: uppercase;">${title}</span></div><h1 style="color: #ffffff; margin: 0; font-size: 42px; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; font-style: italic;">Clear View LLC</h1></div><div style="padding: 50px 40px;"><p style="font-size: 20px; line-height: 1.5; margin-bottom: 40px; color: #334155; font-weight: 300;">${intro}</p><table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 40px; border-collapse: separate; border-spacing: 0 10px;"><tr><td style="background: #f8fafc; padding: 20px; border-radius: 16px 0 0 16px; border: 1px solid #e2e8f0; border-right: none;"><span style="display: block; color: #94a3b8; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 2px; margin-bottom: 8px;">Scheduled Date(s)</span><strong style="color: #0f172a; font-size: 16px;">${data.date}</strong></td><td style="background: #f8fafc; padding: 20px; border-radius: 0 16px 16px 0; border: 1px solid #e2e8f0; border-left: none;"><span style="display: block; color: #94a3b8; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 2px; margin-bottom: 8px;">Arrival Window</span><strong style="color: #0284c7; font-size: 16px;">${data.time}</strong></td></tr></table><div style="margin-bottom: 40px;"><h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 3px; color: #94a3b8; margin-bottom: 20px; font-weight: 800; text-align: center;">Service Breakdown</h3><div style="background: #ffffff; border: 1px solid #f1f5f9; border-radius: 20px; padding: 25px; font-size: 14px; font-weight: 500; color: #1e293b; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); white-space: pre-line; line-height: 1.8;">${data.serviceBreakdown}</div></div><div style="background: #0f172a; border-radius: 24px; padding: 35px; color: #ffffff;"><table width="100%" style="border-collapse: collapse;"><tr><td style="padding-bottom: 15px; color: #94a3b8; font-size: 13px;">Contract Subtotal</td><td style="padding-bottom: 15px; text-align: right; font-weight: 600;">$${data.subtotal}</td></tr><tr><td style="padding-bottom: 15px; text-align: right; color: #10b981; font-weight: 700;">-$${data.discountAmount}</td></tr><tr><td style="padding-top: 20px; border-top: 1px solid #1e293b; font-size: 16px; font-weight: 800;">Total Balance Due</td><td style="padding-top: 20px; border-top: 1px solid #1e293b; text-align: right; font-size: 28px; font-weight: 900; color: #38bdf8;">$${data.balanceDue}</td></tr></table><p style="margin: 20px 0 0; font-size: 11px; color: #475569; text-align: center; text-transform: uppercase; letter-spacing: 1px;">Due upon completion of service</p>${paymentButton}</div></div><div style="background: #f8fafc; padding: 40px; border-top: 1px solid #f1f5f9;"><div style="text-align: center; margin-bottom: 30px;"><h4 style="margin: 0; text-transform: uppercase; font-size: 10px; letter-spacing: 4px; color: #94a3b8; font-weight: 800;">Preparation Guide</h4></div><table width="100%" style="font-size: 13px; color: #475569; line-height: 1.8; margin-bottom: 30px;"><tr><td style="padding-bottom: 12px;">🔹 Ensure outdoor water spigots are accessible and turned ON.</td></tr><tr><td style="padding-bottom: 12px;">🔹 Please provide 3ft of clearance around interior windows.</td></tr><tr><td style="padding-bottom: 12px;">🔹 Secure all pets and move fragile items away from work areas.</td></tr><tr><td style="padding-top: 10px;">⏰ <strong style="color: #0f172a;">Reminder:</strong> You will receive a text or email reminder within 24 hours before your service.</td></tr></table><div style="border-top: 1px solid #e2e8f0; text-align: center; padding-top: 30px;"><p style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 10px; text-transform: uppercase; font-style: italic;">Thank you for booking with us!</p><p style="text-transform: uppercase; font-size: 10px; letter-spacing: 2px; color: #94a3b8; font-weight: 800; margin-bottom: 15px;">Clear View LLC</p><p style="font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 5px;">📞 (206) 848-9325</p><p style="font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 25px;">📧 clearview3cleaners@gmail.com</p></div></div></div></body></html>`;
+    return `<!DOCTYPE html><html><body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; background-color: #f1f5f9; margin: 0; padding: 40px 20px;"><div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 32px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);"><div style="background: #0f172a; padding: 60px 40px; text-align: center;"><div style="display: inline-block; padding: 12px 24px; border: 1px solid #334155; border-radius: 100px; margin-bottom: 24px;"><span style="color: #38bdf8; font-size: 10px; font-weight: 900; letter-spacing: 4px; text-transform: uppercase;">${title}</span></div><h1 style="color: #ffffff; margin: 0; font-size: 42px; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; font-style: italic;">Clear View LLC</h1></div><div style="padding: 50px 40px;"><p style="font-size: 20px; line-height: 1.5; margin-bottom: 40px; color: #334155; font-weight: 300;">${intro}</p><table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 40px; border-collapse: separate; border-spacing: 0 10px;"><tr><td style="background: #f8fafc; padding: 20px; border-radius: 16px 0 0 16px; border: 1px solid #e2e8f0; border-right: none;"><span style="display: block; color: #94a3b8; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 2px; margin-bottom: 8px;">Scheduled Date(s)</span><strong style="color: #0f172a; font-size: 16px;">${data.date}</strong></td><td style="background: #f8fafc; padding: 20px; border-radius: 0 16px 16px 0; border: 1px solid #e2e8f0; border-left: none;"><span style="display: block; color: #94a3b8; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 2px; margin-bottom: 8px;">Arrival Window</span><strong style="color: #0284c7; font-size: 16px;">${data.time}</strong></td></tr></table><div style="margin-bottom: 40px;"><h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 3px; color: #94a3b8; font-weight: 800; margin-bottom: 20px; text-align: center;">Investment Summary</h3><div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 24px;"><div style="margin-bottom: 12px; font-size: 14px; font-weight: 700;">Cleaning Services</div><div style="color: #64748b; font-size: 12px; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap;">${data.serviceBreakdown}</div><div style="border-top: 1px dashed #e2e8f0; padding-top: 20px; display: flex; justify-content: space-between;"><span style="color: #64748b; font-size: 14px; font-weight: 600;">Total Amount</span><strong style="color: #0f172a; font-size: 20px; font-weight: 900;">$${data.balanceDue}</strong></div></div></div>${paymentButton}<div style="margin-top: 50px; padding-top: 30px; border-top: 1px solid #f1f5f9; text-align: center; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">&copy; ${new Date().getFullYear()} Clear View LLC</div></div></div></body></html>`;
   };
 
   const sendInvoiceEmail = async () => {
@@ -192,7 +202,19 @@ const JobCard: React.FC<JobCardProps> = ({
               {job.isGoBack && <span className="bg-orange-500 text-white px-4 py-1.5 rounded-full font-black text-[9px] uppercase tracking-widest shadow-lg shadow-orange-500/20 italic">REDO / GO-BACK</span>}
             </div>
             {!isExpanded && (
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 flex-wrap"><span className="text-blue-600 font-black italic flex items-center gap-1"><Building2 size={10}/> {job.branch || 'Tri-Cities'}</span><span className="opacity-20">•</span><MapPin size={10} className="text-emerald-600/50"/> {displayCity} • {mStats.srv.length} Services {job.assignedTo && <span className="text-emerald-600 font-black italic ml-1 flex items-center gap-1"><UserCheck size={10}/> {allEmployees.find(e => e.id === job.assignedTo)?.name}</span>}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 flex-wrap"><span className="text-blue-600 font-black italic flex items-center gap-1"><Building2 size={10}/> {job.branch || 'Tri-Cities'}</span><span className="opacity-20">•</span><MapPin size={10} className="text-emerald-600/50"/> {displayCity} • {job.selectedServices && job.selectedServices.length > 0 ? job.selectedServices.map((service: string, index: number) => {
+                    const serviceMap: { [key: string]: string } = {
+                      'Window Cleaning': 'Window Cleaning',
+                      'Gutter Cleaning': 'Gutter Cleaning',
+                      'Roof Blow-off': 'Roof Blow-off',
+                      'Moss Treatment': 'Moss Treatment',
+                      'Acid Wash Removal': 'Acid Wash Removal',
+                      'Screen Detail': 'Screen Detail',
+                      'Downspout Flush': 'Downspout Flush',
+                      'Exterior Gutter Wash': 'Exterior Gutter Wash'
+                    };
+                    return serviceMap[service] || service;
+                  }).join(' / ') : 'Standard Cleaning'} {job.assignedTo && <span className="text-emerald-600 font-black italic ml-1 flex items-center gap-1"><UserCheck size={10}/> {allEmployees.find(e => e.id === job.assignedTo)?.name}</span>}</p>
             )}
           </div>
         </div>
@@ -205,20 +227,20 @@ const JobCard: React.FC<JobCardProps> = ({
       {isExpanded && (
         <div className="animate-in fade-in zoom-in-95 duration-500">
           <div className="flex flex-col lg:flex-row justify-between items-start gap-8 mb-12">
-            <div className="min-w-0 flex-1 space-y-6">
-              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-slate-500 hover:text-emerald-600 group"><MapPin size={20} className="text-emerald-600" /><span className="text-xl md:text-2xl font-bold border-b-2 border-slate-100 group-hover:border-emerald-600">{fullAddress}</span></a>
-              <div className="flex wrap items-center gap-6 pl-1">
-                <div className="flex items-center gap-3 text-slate-400"><Smartphone size={18} className="text-emerald-600/50" /><span className="text-lg font-black tracking-widest">{job.phone || 'N/A'}</span></div>
-                <div className="relative group">
+            <div className="min-w-0 flex-1 space-y-6 text-left">
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-slate-500 hover:text-emerald-600 group text-left"><MapPin size={20} className="text-emerald-600" /><span className="text-xl md:text-2xl font-bold border-b-2 border-slate-100 group-hover:border-emerald-600">{fullAddress}</span></a>
+              <div className="flex flex-wrap items-center gap-x-12 gap-y-4 pl-1 text-left">
+                <div className="flex items-center gap-3 text-slate-400 whitespace-nowrap shrink-0 text-left"><Smartphone size={18} className="text-emerald-600/50" /><span className="text-lg font-black tracking-widest">{job.phone || 'N/A'}</span></div>
+                <div className="relative group min-w-0 flex items-center text-left">
                   {isEditingEmail ? (
                     <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-emerald-500 animate-in fade-in slide-in-from-left-2">
                       <input autoFocus type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} onBlur={handleEmailUpdate} onKeyDown={(e) => e.key === 'Enter' && handleEmailUpdate()} className="bg-transparent border-none outline-none text-sm font-bold text-slate-900 min-w-[200px]" />
                       <Check size={14} className="text-emerald-600 cursor-pointer" onClick={handleEmailUpdate} />
                     </div>
                   ) : (
-                    <div onClick={() => setIsEditingEmail(true)} className="flex items-center gap-3 text-slate-400 hover:text-emerald-600 cursor-pointer transition-colors group">
+                    <div onClick={() => setIsEditingEmail(true)} className="flex items-center gap-3 text-slate-400 hover:text-emerald-600 cursor-pointer transition-colors group text-left">
                       <Mail size={18} className="text-emerald-600/50 group-hover:text-emerald-600" />
-                      <span className="text-sm font-bold uppercase tracking-tight border-b border-transparent group-hover:border-emerald-600">{recipientEmail || 'N/A'}</span>
+                      <span className="text-sm font-bold uppercase tracking-tight border-b border-transparent group-hover:border-emerald-600 truncate">{recipientEmail || 'N/A'}</span>
                       <Edit2 size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   )}
@@ -240,16 +262,42 @@ const JobCard: React.FC<JobCardProps> = ({
                 <div ref={assignRef} className="relative">
                   <button onClick={() => setIsAssignOpen(!isAssignOpen)} className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase italic text-[10px] tracking-[0.2em] shadow-xl hover:scale-105 transition-all flex items-center gap-3"><UserPlus size={16}/> Assign Tech</button>
                   {isAssignOpen && (
-                    <div className="absolute right-0 top-full mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 p-3 z-50 animate-in slide-in-from-top-2">
-                      {allEmployees.map(emp => (<button key={emp.id} onClick={() => { updateJob?.(job.id, job, { assignedTo: emp.id }, true); setIsAssignOpen(false); }} className="w-full text-left px-6 py-4 rounded-xl hover:bg-emerald-50 text-slate-900 font-black uppercase italic text-[10px] tracking-widest transition-all flex items-center justify-between group"><span>{emp.name}</span><ArrowRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-emerald-600"/></button>))}
+                    <div className="absolute right-0 top-full mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 p-3 z-50 animate-in slide-in-from-top-2 text-left">
+                      {allTechs.map(emp => (
+                        <button 
+                          key={emp.id} 
+                          onClick={() => { 
+                            if (!emp.isOffDuty) {
+                              updateJob?.(job.id, job, { assignedTo: emp.id }, true); 
+                              setIsAssignOpen(false); 
+                            }
+                          }} 
+                          disabled={emp.isOffDuty}
+                          className={`w-full text-left px-6 py-4 rounded-xl font-black uppercase italic text-[10px] tracking-widest transition-all flex items-center justify-between group ${
+                            emp.isOffDuty 
+                              ? 'bg-slate-50 text-slate-300 cursor-not-allowed opacity-50' 
+                              : 'hover:bg-emerald-50 text-slate-900 cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <span>{emp.name}</span>
+                            {emp.isOffDuty && (
+                              <span className="text-[7px] text-red-400 normal-case font-bold tracking-normal italic">
+                                Off-Duty ({emp.offDutyType === 'vacation' ? 'Vacation' : emp.offDutyType === 'sick' ? 'Sick' : 'Vacation/Sick'})
+                              </span>
+                            )}
+                          </div>
+                          {!emp.isOffDuty && <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-emerald-600"/>}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-2xl border border-slate-800 shadow-xl">
-                  <div className="flex items-center gap-4 px-6 py-2">
+                <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-2xl border border-slate-800 shadow-xl text-left">
+                  <div className="flex items-center gap-4 px-6 py-2 text-left">
                     <div className={`w-2.5 h-2.5 rounded-full ${assignedMember?.status === 'clocked_in' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                    <div className="text-left"><p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Technician</p><p className="text-xs font-black text-white uppercase italic tracking-tighter">{assignedMember?.name}</p></div>
+                    <div className="text-left text-left text-left text-left text-left"><p className="text-[7px] font-black text-slate-500 uppercase tracking-widest text-left">Technician</p><p className="text-xs font-black text-white uppercase italic tracking-tighter text-left">{assignedMember?.name}</p></div>
                   </div>
                   <button onClick={() => updateJob?.(job.id, job, { assignedTo: null }, true)} className="p-3 bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all"><X size={14}/></button>
                 </div>
@@ -257,15 +305,15 @@ const JobCard: React.FC<JobCardProps> = ({
             </div>
           </div>
 
-          <div className="pt-12 border-t border-slate-100 space-y-12">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-emerald-600"><Info size={18}/><h4 className="font-black uppercase italic text-sm tracking-tighter">Work Order Specs</h4></div>
+          <div className="pt-12 border-t border-slate-100 space-y-12 text-left">
+            <div className="flex items-center justify-between text-left">
+              <div className="flex items-center gap-2 text-emerald-600 text-left"><Info size={18}/><h4 className="font-black uppercase italic text-sm tracking-tighter text-left">Work Order Specs</h4></div>
               <button onClick={() => toggleLock?.(job.id)} className={`flex items-center gap-2 px-6 py-2.5 rounded-full transition-all font-black text-[8px] uppercase tracking-widest border ${isUnlocked ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>{isUnlocked ? <Unlock size={12}/> : <Lock size={12}/>} {isUnlocked ? 'Safe-Edit Mode Active' : 'Unlock to Edit'}</button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-              <div className="lg:col-span-4 space-y-8">
-                <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 text-left">
+              <div className="lg:col-span-4 space-y-8 text-left">
+                <div className="grid grid-cols-2 gap-3 text-left">
                   <ParamBtn label="Stories" value={job.stories} onClick={() => updateJob?.(job.id, job, { stories: (job.stories % 3) + 1 })} active />
                   <ParamBtn label="Bedrooms" value={job.homeSize} onClick={() => updateJob?.(job.id, job, { homeSize: job.homeSize === '1-2' ? '3-4' : job.homeSize === '3-4' ? '5+' : '1-2' })} active />
                 </div>
@@ -277,11 +325,11 @@ const JobCard: React.FC<JobCardProps> = ({
                 </div>
               </div>
 
-              <div className="lg:col-span-8 space-y-12">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100">
-                    <div className="flex items-center gap-2 text-emerald-600"><Sparkles size={16}/><p className="text-[10px] font-black uppercase tracking-widest italic">Service Toggles</p></div>
-                    <div className="grid grid-cols-1 gap-3">
+              <div className="lg:col-span-8 space-y-12 text-left">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                  <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 text-left">
+                    <div className="flex items-center gap-2 text-emerald-600 text-left text-left"><Sparkles size={16}/><p className="text-[10px] font-black uppercase tracking-widest italic text-left text-left">Service Toggles</p></div>
+                    <div className="grid grid-cols-1 gap-3 text-left">
                       <SubToggle label="Mark as Go-Back / REDO" active={job.isGoBack} onClick={() => updateJob?.(job.id, job, { isGoBack: !job.isGoBack })} icon={<RefreshCw size={12}/>} />
                       <SubToggle label="Downspout Flush" active={job.gutterFlush} onClick={() => updateJob?.(job.id, job, { gutterFlush: !job.gutterFlush })} icon={<Droplets size={12}/>} />
                       <SubToggle label="Roof Blow-off" active={job.roofBlowOff} onClick={() => updateJob?.(job.id, job, { roofBlowOff: !job.roofBlowOff })} icon={<Wind size={12}/>} />
@@ -289,16 +337,16 @@ const JobCard: React.FC<JobCardProps> = ({
                       <SubToggle label="Acid Wash Removal" active={job.mossAcidWash} onClick={() => updateJob?.(job.id, job, { mossAcidWash: !job.mossAcidWash })} icon={<Sparkles size={12}/>} />
                     </div>
                   </div>
-                  <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100">
-                    <div className="flex items-center gap-2 text-emerald-600"><Smartphone size={16}/><p className="text-[10px] font-black uppercase tracking-widest italic">Misc Options</p></div>
-                    <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 text-left">
+                    <div className="flex items-center gap-2 text-emerald-600 text-left text-left"><Smartphone size={16}/><p className="text-[10px] font-black uppercase tracking-widest italic text-left text-left">Misc Options</p></div>
+                    <div className="grid grid-cols-1 gap-3 text-left">
                       <SubToggle label="Deluxe Screen Detail" active={job.deluxeWindow} onClick={() => updateJob?.(job.id, job, { deluxeWindow: !job.deluxeWindow })} icon={<Sun size={12}/>} />
                       <SubToggle label="Exterior Gutter Wash" active={job.deluxeGutter} onClick={() => updateJob?.(job.id, job, { deluxeGutter: !job.deluxeGutter })} icon={<Sparkles size={12}/>} />
                       <SubToggle label="Military Discount (10%)" active={job.militaryDiscount} onClick={() => updateJob?.(job.id, job, { militaryDiscount: !job.militaryDiscount })} icon={<ShieldCheck size={12}/>} />
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4"><div className="flex items-center gap-2 text-slate-400"><HandCoins size={16}/><p className="text-[10px] font-black uppercase tracking-widest italic">Technician Notes</p></div><textarea readOnly={!isUnlocked} defaultValue={job.memo} onBlur={(e) => updateJob?.(job.id, job, { memo: e.target.value })} className={`w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-bold outline-none min-h-[80px] transition-all shadow-inner ${isUnlocked ? 'focus:border-emerald-600 bg-white' : ''}`} placeholder="Update job details..." /></div>
+                <div className="space-y-4 text-left text-left"><div className="flex items-center gap-2 text-slate-400 text-left text-left text-left text-left"><HandCoins size={16}/><p className="text-[10px] font-black uppercase tracking-widest italic text-left text-left text-left text-left">Technician Notes</p></div><textarea readOnly={!isUnlocked} defaultValue={job.memo} onBlur={(e) => updateJob?.(job.id, job, { memo: e.target.value })} className={`w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-bold outline-none min-h-[80px] transition-all shadow-inner text-left text-left text-left text-left ${isUnlocked ? 'focus:border-emerald-600 bg-white' : ''}`} placeholder="Update job details..." /></div>
               </div>
             </div>
           </div>

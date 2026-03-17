@@ -47,6 +47,11 @@ export default function FinalReview({ formData, setFormData, stats, onNext, onBa
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto py-4">
+      {/* TOP NAVIGATION */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 italic">Step 4 of 4 • Final Review</span>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic leading-none mb-2">Final Review</h2>

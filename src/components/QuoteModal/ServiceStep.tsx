@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { CheckCircle2, ChevronRight, Layout, Waves, Droplets, PlusCircle, Check, ChevronLeft, Minus, Plus, Wind } from 'lucide-react';
 
 interface ServiceStepProps {
@@ -42,6 +42,46 @@ export default function ServiceStep({ formData, setFormData, stats, onNext, onBa
   const sExt = Number(formData.skylightCount) || 0;
   const sInt = Number(formData.skylightInteriorCount) || 0;
 
+  const isInvalid = useMemo(() => {
+    const selected = formData.selectedServices || [];
+    if (selected.length === 0) return true;
+
+    // 1. Window Cleaning Validation
+    if (selected.includes('Window Cleaning')) {
+      const hasWindows = (Number(formData.windowCount) || 0) > 0;
+      const typeSelected = formData.windowType !== 'none';
+      if (!hasWindows || !typeSelected) return true;
+    }
+
+    // 2. Solar Panel Validation
+    if (selected.includes('Solar Panel Cleaning')) {
+      const hasPanels = (Number(formData.solarPanelCount) || 0) > 0;
+      if (!hasPanels) return true;
+    }
+
+    // 3. Pressure Washing Validation (Must select at least one surface)
+    if (selected.includes('Pressure Washing')) {
+      const hasSurface = 
+        formData.trexWash || 
+        formData.sidingCleaning || 
+        formData.backPatio || 
+        (formData.drivewaySize && formData.drivewaySize !== 'none');
+      if (!hasSurface) return true;
+    }
+
+    // 4. Roof Maintenance Validation (Must select at least one treatment)
+    if (selected.includes('Roof Cleaning')) {
+      const hasTreatment = 
+        formData.roofCleaning || 
+        formData.roofBlowOff || 
+        formData.mossTreatment || 
+        formData.mossAcidWash;
+      if (!hasTreatment) return true;
+    }
+
+    return false;
+  }, [formData]);
+
   return (
     <div className="space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 relative">
       
@@ -54,46 +94,46 @@ export default function ServiceStep({ formData, setFormData, stats, onNext, onBa
         
         {/* SUMMARY BOX (Sticky Quote) */}
         <div className="lg:col-span-5 order-first lg:order-last">
-          <div className="bg-slate-900 rounded-[2.5rem] lg:rounded-[3rem] p-6 lg:p-10 text-white sticky top-4 shadow-2xl border border-white/5 overflow-hidden">
+          <div className="bg-white rounded-[2.5rem] lg:rounded-[3rem] p-6 lg:p-10 text-slate-900 sticky top-4 shadow-2xl border border-slate-100 overflow-hidden">
             {/* Background Glow Decor */}
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-600/20 blur-[80px] rounded-full" />
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-50 blur-[80px] rounded-full" />
             
-            <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-6 lg:mb-8 relative z-10">Quote Estimate</h4>
+            <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-6 lg:mb-8 relative z-10">Quote Estimate</h4>
             
             <div className="space-y-4 lg:space-y-5 mb-8 lg:mb-10 min-h-[120px] lg:min-h-[160px] relative z-10">
-              {stats.lineItems.length > 0 ? (
+              {stats?.lineItems?.length > 0 ? (
                 stats.lineItems.map((item: any) => (
                   <div key={item.name} className="flex justify-between items-center animate-in slide-in-from-right-4">
-                    <span className="text-[10px] lg:text-xs font-bold uppercase tracking-tight text-slate-300">{item.name}</span>
-                    <span className="text-sm font-black text-white italic">+${item.price.toFixed(2)}</span>
+                    <span className="text-[10px] lg:text-xs font-bold uppercase tracking-tight text-slate-400">{item.name}</span>
+                    <span className="text-sm font-black text-slate-900 italic">+${item.price.toFixed(2)}</span>
                   </div>
                 ))
               ) : (
-                <div className="py-8 lg:py-10 text-center border border-dashed border-slate-800 rounded-3xl">
-                  <p className="text-[9px] lg:text-[10px] font-black uppercase text-slate-600 italic">Select a service to start</p>
+                <div className="py-8 lg:py-10 text-center border border-dashed border-slate-200 rounded-3xl">
+                  <p className="text-[9px] lg:text-[10px] font-black uppercase text-slate-300 italic">Select a service to start</p>
                 </div>
               )}
               
-              {stats.discounts && stats.discounts.map((d: any) => (
-                <div key={d.name} className="flex justify-between items-center text-[10px] text-emerald-400 font-black uppercase italic pt-4 border-t border-white/5">
+              {stats?.discounts && stats.discounts.map((d: any) => (
+                <div key={d.name} className="flex justify-between items-center text-[10px] text-emerald-600 font-black uppercase italic pt-4 border-t border-slate-50">
                   <span>{d.name}</span><span>-${d.amount.toFixed(2)}</span>
                 </div>
               ))}
             </div>
 
-            <div className="pt-6 lg:pt-8 border-t border-slate-800 flex justify-between items-end relative z-10">
+            <div className="pt-6 lg:pt-8 border-t border-slate-100 flex justify-between items-end relative z-10">
               <div>
-                <p className="text-[9px] lg:text-[10px] font-black uppercase text-slate-500">Total Investment</p>
-                <p className="text-4xl lg:text-5xl font-black italic text-blue-500 leading-none mt-2">${stats.total}</p>
+                <p className="text-[9px] lg:text-[10px] font-black uppercase text-slate-400">Total Investment</p>
+                <p className="text-4xl lg:text-5xl font-black italic text-blue-600 leading-none mt-2">${stats?.total || '0.00'}</p>
               </div>
               <div className="text-right">
-                <p className="text-[9px] lg:text-[10px] font-black uppercase text-slate-500">Est. Time</p>
-                <p className="text-lg lg:text-xl font-black italic text-white">{stats.timeDisplay || '0h'}</p>
+                <p className="text-[9px] lg:text-[10px] font-black uppercase text-slate-400">Est. Time</p>
+                <p className="text-lg lg:text-xl font-black italic text-slate-900">{stats?.timeDisplay || '0h'}</p>
               </div>
             </div>
 
             <button 
-              disabled={!formData.selectedServices || formData.selectedServices.length === 0} 
+              disabled={isInvalid} 
               onClick={onNext} 
               className="w-full mt-8 lg:mt-10 py-5 lg:py-7 bg-blue-600 text-white rounded-3xl lg:rounded-[2.5rem] font-black uppercase italic hover:bg-white hover:text-slate-900 transition-all shadow-xl active:scale-95 group disabled:opacity-20 disabled:grayscale relative z-10"
             >
@@ -408,10 +448,10 @@ export default function ServiceStep({ formData, setFormData, stats, onNext, onBa
                 <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2 animate-in fade-in">
                   <ExtraBadge label="Standard Roof Blow-off" active={formData.roofBlowOff} onClick={() => setFormData({...formData, roofBlowOff: !formData.roofBlowOff, selectedServices: ensureServiceActive('Roof Cleaning', formData.selectedServices)})} />
                   <ExtraBadge label="Baking Soda Treatment" active={formData.mossTreatment} onClick={() => setFormData({...formData, mossTreatment: !formData.mossTreatment, selectedServices: ensureServiceActive('Roof Cleaning', formData.selectedServices)})} />
-                  <ExtraBadge label="Acid Wash Removal" active={formData.mossAcidWash} onClick={() => setFormData({...formData, mossAcidWash: !formData.mossAcidWash, selectedServices: ensureServiceActive('Roof Cleaning', formData.selectedServices)})} />
+                  <ExtraBadge label="Light Acid Wash" active={formData.mossAcidWash} onClick={() => setFormData({...formData, mossAcidWash: !formData.mossAcidWash, selectedServices: ensureServiceActive('Roof Cleaning', formData.selectedServices)})} />
                   <p className="text-[8px] font-black text-slate-400 uppercase ml-2 italic leading-relaxed w-full mt-2">
                     *Baking soda is a light maintenance treatment.<br/>
-                    *Acid wash is for heavy moss removal. We do not pressure wash roofs.
+                    *4% Acid wash is for heavy moss removal. We do not pressure wash roofs.
                   </p>
                 </div>
               )}

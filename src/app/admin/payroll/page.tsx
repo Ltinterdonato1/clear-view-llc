@@ -500,7 +500,7 @@ export default function UnifiedPayrollStaff() {
                                 hourlyRate={emp.hourlyRate}
                                 vacationBalance={emp.vacationBalance || 0}
                                 sickBalance={emp.sickBalance || 0}
-                                readOnlyRate={isSelf && !isOwner}
+                                canEditRate={!(isSelf && !isOwner)}
                                 onSave={() => { 
                                   setIsAddingPunch(false); 
                                   fetchPunches(); 
@@ -509,7 +509,6 @@ export default function UnifiedPayrollStaff() {
                                 onCancel={() => setIsAddingPunch(false)}
                               />;
                             })() : (null)}
-                            ) : (null)
                             {expandedPunches.map(punch => {
                               const isSelf = currentUser?.email === emp.email;
 
@@ -522,7 +521,7 @@ export default function UnifiedPayrollStaff() {
                                       hourlyRate={emp.hourlyRate}
                                       vacationBalance={emp.vacationBalance || 0}
                                       sickBalance={emp.sickBalance || 0}
-                                      readOnlyRate={isSelf && !isOwner}
+                                      canEditRate={!(isSelf && !isOwner)}
                                       onSave={() => { 
                                         setEditingPunch(null); 
                                         fetchPunches(); 
@@ -617,7 +616,13 @@ export default function UnifiedPayrollStaff() {
                 {employees.map((member) => {
                   const isExpanded = expandedStaffId === member.id;
                   const isSelf = currentUser?.email === member.email;
-                  const canEdit = isOwner || (!isSelf);
+                  
+                  // Permissions:
+                  // 1. Owner can edit everything for anyone.
+                  // 2. Admins can edit EVERYTHING for OTHERS.
+                  // 3. Admins can edit ONLY BASIC INFO (Name, Email, Phone, Password) for THEMSELVES.
+                  const canEditAdmin = isOwner || !isSelf;
+                  const canEditBasic = true; // Everyone can edit their own basic info (or admins editing others)
 
                   return (
                     <div key={member.id} className={`group bg-white rounded-[2.5rem] border-2 transition-all duration-500 overflow-hidden ${isExpanded ? 'border-slate-900 shadow-2xl scale-[1.01]' : 'border-slate-50 hover:border-slate-200 hover:shadow-xl'}`}>
@@ -633,17 +638,17 @@ export default function UnifiedPayrollStaff() {
                       {isExpanded && (
                         <div className="px-6 md:px-8 pb-10 space-y-8 animate-in slide-in-from-top-4 duration-500 border-t border-slate-50 pt-8 text-left">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Full Name</label><input type="text" readOnly={!canEdit} value={member.name} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, name: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-slate-900 uppercase ${canEdit ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
-                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Terminal Email</label><input type="email" readOnly={!canEdit} value={member.email || ''} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, email: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-slate-900 ${canEdit ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
+                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Full Name</label><input type="text" readOnly={!canEditBasic} value={member.name} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, name: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-slate-900 uppercase ${canEditBasic ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
+                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Terminal Email</label><input type="email" readOnly={!canEditBasic} value={member.email || ''} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, email: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-slate-900 ${canEditBasic ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Phone</label><input type="tel" readOnly={!canEdit} value={member.phone || ''} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, phone: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-slate-900 ${canEdit ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
-                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic text-red-400">Password Reset</label><input type="text" readOnly={!canEdit} placeholder={canEdit ? "NEW PASSWORD" : "RESTRICTED"} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, newPassword: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-red-400 placeholder:text-red-200 ${canEdit ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
+                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Phone</label><input type="tel" readOnly={!canEditBasic} value={member.phone || ''} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, phone: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-slate-900 ${canEditBasic ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
+                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic text-red-400">Password Reset</label><input type="text" readOnly={!canEditBasic} placeholder={canEditBasic ? "NEW PASSWORD" : "RESTRICTED"} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, newPassword: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-red-400 placeholder:text-red-200 ${canEditBasic ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
                           </div>
                           <div className="grid grid-cols-3 gap-4 text-left">
-                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Hourly</label><input type="number" readOnly={!canEdit} value={member.hourlyRate} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, hourlyRate: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-slate-900 ${canEdit ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
-                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic text-blue-600">PTO</label><input type="number" readOnly={!canEdit} value={member.vacationBalance || 0} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, vacationBalance: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-blue-600 text-blue-600 ${canEdit ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
-                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic text-blue-600">Sick</label><input type="number" readOnly={!canEdit} value={member.sickBalance || 0} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, sickBalance: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-blue-600 text-blue-600 ${canEdit ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
+                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Hourly</label><input type="number" readOnly={!canEditAdmin} value={member.hourlyRate} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, hourlyRate: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-slate-900 ${canEditAdmin ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
+                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic text-blue-600">PTO</label><input type="number" readOnly={!canEditAdmin} value={member.vacationBalance || 0} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, vacationBalance: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-blue-600 text-blue-600 ${canEditAdmin ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
+                            <div className="space-y-2"><label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic text-blue-600">Sick</label><input type="number" readOnly={!canEditAdmin} value={member.sickBalance || 0} onChange={(e) => setEmployees(employees.map(s => s.id === member.id ? {...s, sickBalance: e.target.value} : s))} className={`w-full px-6 py-4 rounded-2xl font-black text-[10px] italic outline-none focus:ring-2 ring-blue-600 text-blue-600 ${canEditAdmin ? 'bg-slate-50' : 'bg-slate-100 text-slate-400'}`} /></div>
                           </div>
                           <div className="space-y-6">
                             <label className="text-[8px] font-black uppercase text-slate-400 ml-4 italic">Role</label>
@@ -652,13 +657,13 @@ export default function UnifiedPayrollStaff() {
                                 <button
                                   key={r}
                                   type="button"
-                                  disabled={!canEdit}
+                                  disabled={!canEditAdmin}
                                   onClick={() => setEmployees(employees.map(s => s.id === member.id ? { ...s, role: r } : s))}
                                   className={`px-4 py-3 rounded-xl font-black text-[9px] uppercase italic transition-all border-2 ${
                                     member.role === r
                                       ? 'bg-slate-900 border-slate-900 text-white'
                                       : 'bg-white border-white text-slate-300 hover:border-slate-200'
-                                  } ${!isOwner ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  } ${!canEditAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                   {r.replace('_', ' ')}
                                 </button>
@@ -672,7 +677,7 @@ export default function UnifiedPayrollStaff() {
                                 <button
                                   key={b}
                                   type="button"
-                                  disabled={!canEdit}
+                                  disabled={!canEditAdmin}
                                   onClick={() => {
                                     const currentBranches = member.homeBranches || [];
                                     const newBranches = currentBranches.includes(b)
@@ -684,7 +689,7 @@ export default function UnifiedPayrollStaff() {
                                     member.homeBranches?.includes(b)
                                       ? 'bg-slate-900 border-slate-900 text-white'
                                       : 'bg-white border-white text-slate-300 hover:border-slate-200'
-                                  } ${!canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  } ${!canEditAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                   {b}
                                 </button>
@@ -692,19 +697,17 @@ export default function UnifiedPayrollStaff() {
                             </div>
                           </div>
                           <div className="flex gap-4 pt-6 border-t border-slate-100 text-left">
-                            {canEdit ? (
-                                <>
-                                    <button onClick={() => saveEdit(member)} className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase italic flex items-center justify-center gap-3 hover:bg-black transition-all">
-                                      {isUpdating ? <Loader2 className="animate-spin" size={16}/> : showSaveSuccess === member.id ? <Check size={16}/> : <Save size={16}/>} 
-                                      {showSaveSuccess === member.id ? 'Updated' : 'Save Changes'}
-                                    </button>
-                                    <button onClick={async () => { if (window.confirm("Permanently terminate this profile?")) await deleteDoc(doc(db, "employees", member.id)); }} className="px-8 py-5 bg-white border-2 border-slate-100 rounded-[1.5rem] font-black text-[10px] uppercase italic text-slate-200 hover:text-red-500 hover:border-red-500 transition-all"><Trash2 size={18}/></button>
-                                </>
+                            <button onClick={() => saveEdit(member)} className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase italic flex items-center justify-center gap-3 hover:bg-black transition-all">
+                              {isUpdating ? <Loader2 className="animate-spin" size={16}/> : showSaveSuccess === member.id ? <Check size={16}/> : <Save size={16}/>} 
+                              {showSaveSuccess === member.id ? 'Updated' : 'Save Changes'}
+                            </button>
+                            {isOwner || !isSelf ? (
+                              <button onClick={async () => { if (window.confirm("Permanently terminate this profile?")) await deleteDoc(doc(db, "employees", member.id)); }} className="px-8 py-5 bg-white border-2 border-slate-100 rounded-[1.5rem] font-black text-[10px] uppercase italic text-slate-200 hover:text-red-500 hover:border-red-500 transition-all"><Trash2 size={18}/></button>
                             ) : (
-                                <div className="flex-1 py-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-[8px] uppercase italic text-slate-400 text-center flex items-center justify-center gap-3">
-                                    <ShieldCheck size={14} className="text-blue-500" />
-                                    Self-Editing Restricted
-                                </div>
+                              <div className="px-8 py-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-[7px] uppercase italic text-slate-300 flex items-center justify-center gap-2">
+                                <ShieldCheck size={14} className="text-blue-500" />
+                                Protected
+                              </div>
                             )}
                           </div>
                         </div>

@@ -38,7 +38,7 @@ describe('JobCard Component', () => {
     windowType: 'both',
     homeSize: '3-4',
     stories: 2,
-    total: '450',
+    total: '517.12',
     timeSlot: 'morning',
     actualBookedDays: [new Date()],
     memo: 'Watch out for the dog'
@@ -56,9 +56,9 @@ describe('JobCard Component', () => {
   it('renders basic job information', () => {
     render(<JobCard {...mockProps} />);
     expect(screen.getByText(/John Doe/i)).toBeInTheDocument();
-    // The component recalculates total based on services. 
-    // 20 windows (both) + 3-4 Bed Gutters + 2 Stories = $522.00
-    expect(screen.getByText(/522/i)).toBeInTheDocument();
+    // Calculated: 20 windows (both: 20*14=280) + 3-4 Bed Gutters (225) + 2 Stories (50, added to windows). Total Base: 555. 
+    // Discount (Window + Gutter = 10%): 55.50. Before Tax: 499.50. Tax (assumed 8.7% on taxable portion of 225): 17.62. Final Total: 517.12
+    expect(screen.getByText(/517.12/i)).toBeInTheDocument();
   });
 
   it('expands when clicked to show details', () => {
@@ -70,10 +70,10 @@ describe('JobCard Component', () => {
     expect(screen.getByText(/Watch out for the dog/i)).toBeInTheDocument();
   });
 
-  it('shows "Unlock Authority" button when expanded', () => {
+  it('shows "Unlock to Edit" button when expanded', () => {
     render(<JobCard {...mockProps} />);
     fireEvent.click(screen.getByText(/John Doe/i));
-    expect(screen.getByText(/Unlock Authority/i)).toBeInTheDocument();
+    expect(screen.getByText(/Unlock to Edit/i)).toBeInTheDocument();
   });
 
   it('requires passcode logic trigger when toggleLock is called', () => {
@@ -81,7 +81,7 @@ describe('JobCard Component', () => {
     render(<JobCard {...mockProps} toggleLock={toggleLock} />);
     fireEvent.click(screen.getByText(/John Doe/i));
     
-    const unlockBtn = screen.getByText(/Unlock Authority/i);
+    const unlockBtn = screen.getByText(/Unlock to Edit/i);
     fireEvent.click(unlockBtn);
     expect(toggleLock).toHaveBeenCalledWith(mockJob.id);
   });

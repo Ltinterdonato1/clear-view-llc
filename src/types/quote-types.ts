@@ -64,7 +64,6 @@ export interface FormData {
   day1SelectedSlotStartTimeMinutes: number | null;
   day1SelectedJobEndTimeMinutes: number | null;
   day2SelectedSlotStartTimeMinutes: number | null;
-  day1SelectedJobEndTimeMinutes: number | null;
   day2SelectedJobEndTimeMinutes: number | null;
   isAllDayBlockMode: boolean;
   mode: 'standard' | 'split' | 'allDayBlock' | 'single';
@@ -78,6 +77,7 @@ export interface FormData {
   referralSource?: string;
   availableReferralRewards?: number;
   militaryDiscount?: boolean;
+  actualBookedDays?: any[];
 }
 
 export interface CalendarStepProps {

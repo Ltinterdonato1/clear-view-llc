@@ -13,6 +13,9 @@ vi.mock('lucide-react', () => ({
   PlusCircle: () => <span>PlusCircle</span>,
   Check: () => <span>Check</span>,
   ChevronLeft: () => <span>ChevronLeft</span>,
+  Minus: () => <span>Minus</span>,
+  Plus: () => <span>Plus</span>,
+  Wind: () => <span>Wind</span>,
 }));
 
 const mockStats = {

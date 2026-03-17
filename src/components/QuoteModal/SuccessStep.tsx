@@ -23,7 +23,7 @@ export default function SuccessStep({ onClose }: any) {
       
 
       {/* Success Header */}
-      <h2 className="text-6xl font-black text-brand-blue uppercase tracking-tighter italic leading-none">
+      <h2 className="text-6xl font-black text-slate-900 uppercase tracking-tighter italic leading-none">
         You're All Set!
       </h2>
       
@@ -53,10 +53,10 @@ export default function SuccessStep({ onClose }: any) {
           </p>
           <div className="flex flex-col gap-2">
             <p className="text-sm font-black text-slate-800 uppercase italic">
-              Call: <span className="text-brand-blue ml-1">(206) 848-9325</span>
+              Call: <span className="text-slate-900 ml-1">(206) 848-9325</span>
             </p>
             <p className="text-sm font-black text-slate-800 uppercase italic">
-              Email: <a href="mailto:clearview3cleaners@gmail.com" className="text-brand-blue underline hover:text-brand-orange transition-colors lowercase font-bold">clearview3cleaners@gmail.com</a>
+              Email: <a href="mailto:clearview3cleaners@gmail.com" className="text-slate-900 underline hover:text-brand-orange transition-colors lowercase font-bold">clearview3cleaners@gmail.com</a>
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { User, Phone, Mail, MapPin, Users, ShieldCheck, Building2 } from 'lucide-react';
+import { User, Phone, Mail, MapPin, Users, ShieldCheck, Building2, ChevronRight } from 'lucide-react';
 
 // Organized by branch for selective filtering
 const BRANCH_CITY_MAP: Record<string, string[]> = {
@@ -41,16 +41,14 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
     !formData.lastName?.trim() || 
     formData.phone.length < 14 || 
     !formData.email.includes('@') ||
-    formData.address.length < 5 ||
+    (formData.address?.trim().length || 0) < 5 ||
     !formData.city || 
-    !formData.branch ||
-    (formData.city === 'Other' && !formData.otherCity?.trim());
+    !formData.branch;
 
   return (
     <div className="space-y-6 max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-black text-brand-blue uppercase tracking-tight italic">Contact Details</h2>
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Step 1 of 4</p>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 italic">Step 1 of 4 • Contact Details</span>
       </div>
 
       {/* NAME ROW */}
@@ -60,7 +58,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
           <input 
             type="text" 
             placeholder="First Name" 
-            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-brand-blue"
+            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-900"
             value={formData.firstName} 
             onChange={e => setFormData({...formData, firstName: e.target.value})} 
           />
@@ -70,7 +68,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
           <input 
             type="text" 
             placeholder="Last Name" 
-            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-brand-blue"
+            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-900"
             value={formData.lastName} 
             onChange={e => setFormData({...formData, lastName: e.target.value})} 
           />
@@ -82,14 +80,14 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
         <input 
           type="email" 
           placeholder="Email Address" 
-          className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-brand-blue"
+          className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-900"
           value={formData.email} 
           onChange={e => setFormData({...formData, email: e.target.value})} 
         />
         <input 
           type="tel" 
           placeholder="Phone Number" 
-          className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-brand-blue"
+          className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-900"
           value={formData.phone} 
           onChange={e => setFormData({...formData, phone: formatPhone(e.target.value)})} 
         />
@@ -101,7 +99,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
         <div className="relative">
           <select 
             className={`w-full p-4 bg-blue-50 border border-blue-100 rounded-2xl outline-none font-bold appearance-none cursor-pointer
-              ${formData.branch ? 'text-blue-600' : 'text-slate-400'}`}
+              ${formData.branch ? 'text-slate-900' : 'text-slate-400'}`}
             value={formData.branch}
             onChange={e => {
               const b = e.target.value;
@@ -111,7 +109,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
             <option value="" disabled>Select your closest Major Branch...</option>
             {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-blue-400">▼</div>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-900">▼</div>
         </div>
       </div>
 
@@ -123,7 +121,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
             disabled={!formData.branch}
             className={`w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold appearance-none cursor-pointer
               ${!formData.branch ? 'opacity-40 cursor-not-allowed' : ''}
-              ${formData.city ? 'text-brand-blue' : 'text-slate-400'}`}
+              ${formData.city ? 'text-slate-900' : 'text-slate-400'}`}
             value={formData.city}
             onChange={e => setFormData({...formData, city: e.target.value})}
           >
@@ -140,7 +138,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
         <input 
           type="text" 
           placeholder="Enter WA City Name" 
-          className="w-full p-4 bg-blue-50 border border-blue-100 rounded-2xl outline-none font-bold text-brand-blue"
+          className="w-full p-4 bg-blue-50 border border-blue-100 rounded-2xl outline-none font-bold text-slate-900"
           value={formData.otherCity || ''} 
           onChange={e => setFormData({...formData, otherCity: e.target.value})} 
         />
@@ -150,7 +148,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
       <div className="grid grid-cols-4 gap-2">
         <input 
           placeholder="Service Address" 
-          className="col-span-3 w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-brand-blue"
+          className="col-span-3 w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-900"
           value={formData.address} 
           onChange={e => setFormData({...formData, address: e.target.value})} 
         />
@@ -170,7 +168,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
           </div>
           <div className="space-y-3">
             <select 
-              className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-brand-blue appearance-none"
+              className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-slate-900 appearance-none"
               value={isOtherReferral ? 'OTHER' : (formData.referralEmployee || '')}
               onChange={(e) => {
                 const val = e.target.value;
@@ -182,8 +180,9 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
                 }
               }}
             >
-              <option value="">NO REFERRAL</option>
+              <option value=""></option>
               <optgroup label="TEAM MEMBERS">
+                <option value="Lauren Interdonato">Lauren Interdonato</option>
                 {allEmployees.map((emp: any) => (
                   <option key={emp.id} value={emp.id}>{emp.name}</option>
                 ))}
@@ -197,7 +196,7 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
               <input 
                 type="text" 
                 placeholder="Who referred you? (Customer Name)" 
-                className="w-full p-4 bg-blue-50 border border-blue-100 rounded-2xl outline-none font-bold text-brand-blue animate-in slide-in-from-top-2"
+                className="w-full p-4 bg-blue-50 border border-blue-100 rounded-2xl outline-none font-bold text-slate-900 animate-in slide-in-from-top-2"
                 value={formData.referralSource || ''} 
                 onChange={e => setFormData({...formData, referralSource: e.target.value, referralEmployee: ''})} 
                 autoFocus
@@ -215,16 +214,16 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
             onClick={() => setFormData({...formData, militaryDiscount: !formData.militaryDiscount})}
             className={`w-full flex items-center justify-between p-4 border-2 rounded-2xl transition-all group
               ${formData.militaryDiscount 
-                ? 'bg-blue-600 border-blue-600 text-white shadow-lg' 
-                : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-blue-600'}`}
+                ? 'bg-slate-900 border-slate-900 text-white shadow-lg' 
+                : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-900'}`}
           >
             <div className="flex items-center gap-3">
-              <ShieldCheck size={20} className={formData.militaryDiscount ? 'text-white' : 'text-blue-600'} />
+              <ShieldCheck size={20} className={formData.militaryDiscount ? 'text-white' : 'text-slate-900'} />
               <span className="font-black uppercase italic text-xs tracking-widest">Apply Military Discount (10% Off)</span>
             </div>
             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
               ${formData.militaryDiscount ? 'bg-white border-white' : 'bg-white border-slate-200'}`}>
-              {formData.militaryDiscount && <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
+              {formData.militaryDiscount && <div className="w-2.5 h-2.5 rounded-full bg-slate-900" />}
             </div>
           </button>
         </div>
@@ -233,10 +232,10 @@ export default function ContactStep({ formData, setFormData, onNext, allEmployee
       <button 
         disabled={isInvalid} 
         onClick={onNext} 
-        className={`w-full py-5 rounded-2xl font-black text-white shadow-xl transition-all uppercase tracking-widest text-lg
+        className={`w-full py-5 rounded-2xl font-black text-white shadow-xl transition-all uppercase tracking-widest text-lg flex items-center justify-center gap-2
           ${isInvalid ? 'bg-slate-200 cursor-not-allowed text-slate-400' : 'bg-brand-blue hover:brightness-110 active:scale-95 shadow-brand-blue/20'}`}
       >
-        Services
+        Services <ChevronRight size={20} />
       </button>
     </div>
   );

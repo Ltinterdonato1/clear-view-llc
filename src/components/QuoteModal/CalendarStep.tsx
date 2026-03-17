@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { format, startOfDay, addDays, isSameDay } from 'date-fns';
 import {
@@ -57,6 +57,44 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
     if (minutes === 0) return `${hours}h`;
     return `${hours}h ${minutes}m`;
   };
+
+  const handleModeChange = useCallback((mode: 'single' | 'split' | 'allDayBlock') => {
+    setFormData((prev: FormData) => ({
+      ...prev,
+      mode,
+      // Reset date/time selections when mode changes, unless it's explicitly set by force-mode logic.
+      // This prevents issues where previously selected dates/times might conflict with new mode rules.
+      selectedDate: null,
+      endDate: null,
+      timeSlot: null,
+      endSlot: null,
+      isAllDayBlockMode: mode === 'allDayBlock',
+      day1SelectedSlotStartTimeMinutes: null,
+      day1SelectedJobEndTimeMinutes: null,
+      day2SelectedSlotStartTimeMinutes: null,
+      day2SelectedJobEndTimeMinutes: null,
+    }));
+    setSplitStep(1); // Always reset to day 1 when mode changes
+  }, [setFormData]);
+
+  // Effect to automatically set mode based on job duration
+  useEffect(() => {
+    let newMode: 'single' | 'split' | 'allDayBlock';
+    if (totalHoursForAllJobs > 18) {
+      newMode = 'allDayBlock';
+    } else if (totalHoursForAllJobs > 9) {
+      newMode = 'split';
+    } else {
+      newMode = 'single';
+    }
+
+    if (formData.mode !== newMode) {
+      setFormData((prev: FormData) => ({
+        ...prev,
+        mode: newMode,
+      }));
+    }
+  }, [totalHoursForAllJobs, setFormData, formData.mode]);
 
   useEffect(() => {
     const initialMap: Record<string, number> = {};
@@ -196,28 +234,40 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
 
   const canFinalize = isAllDayBlockMode ? formData.selectedDate && formData.timeSlot : isSplitMode ? formData.selectedDate && formData.endDate && formData.timeSlot && formData.endSlot : formData.selectedDate && formData.timeSlot;
 
-  const disabledDays = [
-    { before: startOfDay(currentTime) },
-    ...Object.keys(dayTotalMins).filter((tsStr) => {
+  const disabledDays = useMemo(() => {
+    const today = new Date();
+    const may1st = new Date(today.getFullYear(), 4, 1); // May 1st of current year
+
+    // The earliest selectable date is May 1st.
+    const minSelectableDate = may1st > today ? may1st : today;
+
+    const commonDisabled = Object.keys(dayTotalMins).filter((tsStr) => {
       const ts = Number(tsStr);
       const mins = dayTotalMins[ts] || 0;
       const takenCount = occupiedSlots[ts]?.size || 0;
       
-      // Blur day if:
-      // 1. All day block mode and day has ANY work
-      // 2. All 3 slots are taken
-      // 3. Day is over 500 minutes full
       if (isAllDayBlockMode && mins > 0) return true; 
       if (takenCount >= 3) return true;
       if (mins >= 500) return true; 
       return false;
-    }).map((ts) => new Date(Number(ts))),
-    ...(splitStep === 2 && formData.selectedDate ? [{ before: addDays(formData.selectedDate, 1) }] : []),
-    ...(splitStep > 2 && formData.endDate ? [{ before: addDays(formData.endDate, splitStep - 2) }] : []),
-  ];
+    }).map((ts) => new Date(Number(ts)));
+
+    return [
+      { before: startOfDay(minSelectableDate) },
+      ...commonDisabled,
+      ...(splitStep === 2 && formData.selectedDate ? [{ before: addDays(formData.selectedDate, 1) }] : []),
+      ...(splitStep > 2 && formData.endDate ? [{ before: addDays(formData.endDate, 1) }] : []),
+    ];
+  }, [dayTotalMins, occupiedSlots, isAllDayBlockMode, splitStep, formData.selectedDate, formData.endDate, currentTime]);
+
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 text-left pt-2">
+      {/* TOP NAVIGATION */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 italic">Step 3 of 4 • Appointment Selection</span>
+      </div>
+
       <style jsx global>{`
         .rdp { --rdp-cell-size: 45px; --rdp-accent-color: #2563eb; --rdp-background-color: #dbeafe; margin: 0; }
         .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { background-color: var(--rdp-accent-color) !important; color: white !important; font-weight: 900 !important; border-radius: 12px !important; }
@@ -229,7 +279,7 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
         <button onClick={onBack} className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-blue-600 transition-colors group">
           <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back
         </button>
-        <div className="bg-slate-100 p-1.5 rounded-[2rem] flex gap-1 w-full max-md border border-slate-200">
+        <div className="bg-slate-100 p-1.5 rounded-[2rem] flex gap-1 w-full max-w-md border border-slate-200">
           {(['single', 'split', 'allDayBlock'] as const).map((m) => {
             const isDisabled = (m === 'single' && totalHoursForAllJobs > 9) || 
                                (m === 'split' && (stats.serviceJobs.length < 2 || totalHoursForAllJobs > 18)) || 

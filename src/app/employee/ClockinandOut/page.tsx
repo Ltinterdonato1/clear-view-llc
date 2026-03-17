@@ -3,10 +3,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { auth, db } from '../../../lib/firebase';
 import { 
   doc, onSnapshot, updateDoc, serverTimestamp, 
-  collection, addDoc, query, where, orderBy, getDocs, limit 
+  collection, addDoc, query, where, orderBy, getDocs, limit, getDoc
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Loader2, History, Zap, Download, Calendar as CalendarIcon, Clock, Timer, LogIn, LogOut, RefreshCcw } from 'lucide-react';
+import { 
+  Loader2, History, Zap, Calendar as CalendarIcon, Clock, Timer, 
+  LogIn, LogOut, Receipt, DollarSign, Activity, Check, X
+} from 'lucide-react';
+import { calculateJobStats } from '../../../lib/scheduleUtils';
 
 interface Shift {
   id: string;
@@ -15,34 +19,29 @@ interface Shift {
   endTime?: any;
   date: string;
   totalHours?: number;
+  hourlyRate?: number;
+  type?: string;
+  paidHours?: number;
 }
 
 // --- HELPERS ---
-const formatTime = (decimalHours: number) => {
-  const totalMinutes = Math.round(decimalHours * 60);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return h > 0 ? `${h}H ${m}M` : `${m}M`;
-};
-
-const formatLiveTimer = (ms: number) => {
-  const totalSeconds = Math.floor(ms / 1000);
+const formatPreciseTime = (decimalHours: number) => {
+  const totalSeconds = Math.round(decimalHours * 3600);
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${h}h ${m}m ${s}s`;
 };
 
-// --- DYNAMIC PERIOD GENERATOR (Starts Jan 1st, 2026) ---
 const generatePayPeriods = () => {
   const periods = [];
   const now = new Date();
-  
   let currentMonth = now.getMonth();
   let currentYear = now.getFullYear();
   let isFirstHalf = now.getDate() <= 15;
+  const cutoffDate = new Date(2026, 0, 1);
 
-  while (currentYear >= 2026 && currentMonth >= 0) {
+  while (true) {
     let start, end;
     if (isFirstHalf) {
       start = new Date(currentYear, currentMonth, 1);
@@ -51,96 +50,162 @@ const generatePayPeriods = () => {
       start = new Date(currentYear, currentMonth, 16);
       end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
     }
+    if (start < cutoffDate) break;
     const label = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     periods.push({ label, start, end });
-    if (isFirstHalf) { currentMonth--; isFirstHalf = false; } else { isFirstHalf = true; }
-    if (periods.length > 26) break; 
+    if (isFirstHalf) { currentMonth--; isFirstHalf = false; if (currentMonth < 0) { currentMonth = 11; currentYear--; } } else { isFirstHalf = true; }
+    if (periods.length > 50) break;
   }
   return periods;
 };
 
 export default function ClockPage() {
   const [status, setStatus] = useState<'clocked_in' | 'clocked_out' | 'loading'>('loading');
-  const [history, setHistory] = useState<Shift[]>([]);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
-  const [activeShiftStart, setActiveShiftStart] = useState<Date | null>(null);
-  const [liveElapsed, setLiveLiveElapsed] = useState(0);
-  
   const periods = useMemo(() => generatePayPeriods(), []);
   const [selectedPeriod, setSelectedPeriod] = useState(periods[0]);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-
-  const hoursByDate = useMemo(() => {
-    const map: Record<string, number> = {};
-    history.forEach(shift => {
-      if (shift.date && shift.totalHours) map[shift.date] = (map[shift.date] || 0) + shift.totalHours;
-    });
-    return map;
-  }, [history]);
-
-  const filteredHistory = useMemo(() => {
-    if (!selectedDay) return history;
-    return history.filter(shift => shift.date === selectedDay);
-  }, [history, selectedDay]);
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (status === 'clocked_in' && activeShiftStart) {
-      const interval = setInterval(() => {
-        setLiveLiveElapsed(new Date().getTime() - activeShiftStart.getTime());
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [status, activeShiftStart]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [employeeData, setEmployeeData] = useState<any>(null);
+  const [payrollSummary, setPayrollSummary] = useState<any>(null);
+  const [showPayStub, setShowPayStub] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (!user) return;
+      setCurrentUser(user);
       const userEmail = user.email!.toLowerCase().trim();
       
-      const unsubStatus = onSnapshot(doc(db, "employees", userEmail), (docSnap) => {
-        if (docSnap.exists()) setStatus(docSnap.data().status || 'clocked_out');
+      const unsubEmp = onSnapshot(doc(db, "employees", userEmail), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          setEmployeeData(data);
+          setStatus(data.status || 'clocked_out');
+        }
         setLoading(false);
       });
 
-      const q = query(
-        collection(db, "employees", userEmail, "attendance"), 
-        where("startTime", ">=", selectedPeriod.start),
-        where("startTime", "<=", selectedPeriod.end),
-        orderBy("startTime", "desc")
-      );
-
-      const unsubHistory = onSnapshot(q, (snap) => {
-        const shifts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Shift[];
-        setHistory(shifts);
-        const active = shifts.find(s => s.status === 'active');
-        if (active && active.startTime) {
-          setActiveShiftStart(active.startTime.toDate());
-        } else {
-          setActiveShiftStart(null);
-          setLiveLiveElapsed(0);
-        }
-      });
-
-      return () => { unsubStatus(); unsubHistory(); };
+      return () => unsubEmp();
     });
-  }, [selectedPeriod]);
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    const calculateMyPayroll = async () => {
+      if (!currentUser || !employeeData) return;
+      const userEmail = currentUser.email!.toLowerCase().trim();
+      
+      try {
+        const attendRef = collection(db, "employees", userEmail, "attendance");
+        const q = query(attendRef, where("startTime", ">=", selectedPeriod.start), where("startTime", "<=", selectedPeriod.end), orderBy("startTime", "desc"));
+        const attendSnap = await getDocs(q);
+        const shifts = attendSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const leadsRef = collection(db, "leads");
+        const leadsQuery = query(leadsRef, where("status", "in", ["Archived", "Completed", "completed"]));
+        const leadsSnap = await getDocs(leadsQuery);
+        const allCompletedLeads = leadsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const timeOffBreakdown: any = {
+          vacation: { paid: 0, unpaid: 0, pay: 0 },
+          sick: { paid: 0, unpaid: 0, pay: 0 }
+        };
+        let totalWorkHours = 0;
+        let workPay = 0;
+        const groupingMap: any = {};
+
+        shifts.forEach((s: any) => {
+          const shiftRate = s.hourlyRate || employeeData.hourlyRate || 0;
+          const shiftDate = s.startTime?.toDate?.() || new Date(s.date);
+          const type = s.type || 'work';
+          const groupKey = `${type}-${shiftRate}`;
+
+          if (!groupingMap[groupKey]) {
+            groupingMap[groupKey] = { type, rate: shiftRate, hours: 0, pay: 0, dates: [] };
+          }
+          groupingMap[groupKey].dates.push(shiftDate);
+
+          if (type === 'work') {
+            const hours = s.totalHours || 0;
+            totalWorkHours += hours;
+            workPay += hours * shiftRate;
+            groupingMap[groupKey].hours += hours;
+            groupingMap[groupKey].pay += hours * shiftRate;
+          } else {
+            const t = type as 'vacation' | 'sick';
+            const paid = s.paidHours !== undefined ? s.paidHours : 0;
+            const total = s.totalHours || 0;
+            timeOffBreakdown[t].paid += paid;
+            timeOffBreakdown[t].unpaid += Math.max(0, total - paid);
+            timeOffBreakdown[t].pay += paid * shiftRate;
+            groupingMap[groupKey].hours += paid;
+            groupingMap[groupKey].pay += paid * shiftRate;
+          }
+        });
+
+        const finalizedBreakdown = Object.values(groupingMap).map((group: any) => {
+          const sorted = group.dates.sort((a: any, b: any) => a.getTime() - b.getTime());
+          let range = 'N/A';
+          if (sorted.length > 0) {
+            const startStr = sorted[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const endStr = sorted[sorted.length-1].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            range = startStr === endStr ? startStr : `${startStr} - ${endStr}`;
+          }
+          return { ...group, dateRange: range };
+        }).filter((g: any) => g.hours > 0);
+
+        const ptoPayTotal = timeOffBreakdown.vacation.pay + timeOffBreakdown.sick.pay;
+        const totalPaidHours = totalWorkHours + timeOffBreakdown.vacation.paid + timeOffBreakdown.sick.paid;
+
+        let myTips = 0;
+        let myRefs = 0;
+        allCompletedLeads.forEach((lead: any) => {
+          const pDate = lead.completedAt ? (typeof lead.completedAt === 'string' ? new Date(lead.completedAt) : lead.completedAt.toDate?.()) : null;
+          if (pDate && pDate >= selectedPeriod.start && pDate <= selectedPeriod.end) {
+            if (lead.assignedTo === employeeData.id) myTips += parseFloat(lead.tipAmount || "0");
+            if (lead.referralEmployee === employeeData.id) {
+              const s = calculateJobStats(lead);
+              myRefs += parseFloat(s.referralBonus || "0");
+            }
+          }
+        });
+
+        setPayrollSummary({
+          workPay,
+          ptoPay: ptoPayTotal,
+          tips: myTips,
+          referralBonuses: myRefs,
+          grossPay: workPay + ptoPayTotal + myTips + myRefs,
+          totalWorkHours,
+          totalPaidHours,
+          timeOffBreakdown,
+          lineItems: finalizedBreakdown,
+          shifts,
+          sickAccrued: totalPaidHours / 40,
+          ptoAccrued: totalPaidHours / 40
+        });
+
+      } catch (err) { console.error(err); }
+    };
+
+    calculateMyPayroll();
+  }, [currentUser, employeeData, selectedPeriod]);
 
   const handleClockAction = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-    const userEmail = user.email!.toLowerCase().trim();
+    if (!currentUser || !employeeData) return;
+    const userEmail = currentUser.email!.toLowerCase().trim();
     const empRef = doc(db, "employees", userEmail);
     const attendRef = collection(db, "employees", userEmail, "attendance");
 
     if (status === 'clocked_out') {
       await updateDoc(empRef, { status: 'clocked_in', lastAction: serverTimestamp() });
-      await addDoc(attendRef, { startTime: serverTimestamp(), endTime: null, date: new Date().toLocaleDateString(), status: 'active' });
+      await addDoc(attendRef, { 
+        startTime: serverTimestamp(), 
+        endTime: null, 
+        date: new Date().toLocaleDateString(), 
+        status: 'active',
+        hourlyRate: employeeData.hourlyRate || 0,
+        type: 'work'
+      });
     } else {
       await updateDoc(empRef, { status: 'clocked_out', lastAction: serverTimestamp() });
       const q = query(attendRef, where("status", "==", "active"), limit(1));
@@ -148,191 +213,252 @@ export default function ClockPage() {
       if (!snap.empty) {
         const startTime = snap.docs[0].data().startTime.toDate();
         const hours = parseFloat(((new Date().getTime() - startTime.getTime()) / (1000 * 60 * 60)).toFixed(2));
-        await updateDoc(doc(db, "employees", userEmail, "attendance", snap.docs[0].id), { endTime: serverTimestamp(), status: 'completed', totalHours: hours });
+        await updateDoc(doc(db, "employees", userEmail, "attendance", snap.docs[0].id), { 
+          endTime: serverTimestamp(), 
+          status: 'completed', 
+          totalHours: hours,
+          paidHours: hours 
+        });
       }
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
+  if (loading || !payrollSummary) return (
+    <div className="h-screen flex flex-col items-center justify-center bg-white space-y-6">
+      <Loader2 className="animate-spin text-slate-200" size={64} />
+      <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-300 italic">Reading Terminal...</p>
+    </div>
+  );
 
   return (
-    <div className="p-8 lg:p-16 bg-slate-50 min-h-screen text-left">
+    <div className="p-4 md:p-8 lg:p-12 xl:p-16 space-y-10 max-w-[1600px] mx-auto min-h-screen bg-white text-left font-sans text-slate-900">
       
-      {/* HEADER SECTION */}
-      <div className="max-w-7xl mx-auto mb-12 flex flex-col md:flex-row justify-between items-end gap-8">
-        <div>
-          <h1 className="text-7xl font-black uppercase italic tracking-tighter text-slate-900">Punch Clock</h1>
-          <p className="text-blue-600 font-black uppercase tracking-[0.4em] text-[11px] mt-2 italic flex items-center gap-2">
-            <Clock size={14}/> Crew Attendance System
-          </p>
-        </div>
-        <div className="bg-slate-900 px-10 py-6 rounded-[2.5rem] shadow-2xl border border-slate-800 text-center">
-          <p className="text-blue-500 font-black uppercase tracking-widest text-[10px] mb-1 italic">Current Time</p>
-          <p className="text-5xl font-black text-white italic tracking-tighter uppercase leading-none">
-            {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-          </p>
+      {/* HEADER MATCHING ADMIN */}
+      <div className="flex justify-between items-center border-b border-slate-100 pb-8">
+        <div />
+
+        <div className="flex items-center gap-8">
+          <div className="text-right">
+            <p className="text-slate-400 font-black uppercase text-[8px] tracking-[0.4em] mb-1 italic leading-none">Net Payout</p>
+            <h4 className="text-2xl font-black italic tracking-tighter leading-none">${payrollSummary.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+          </div>
+          <div className="relative group min-w-[240px]">
+            <select 
+              className="w-full bg-slate-50 border-2 border-transparent rounded-[1.5rem] font-black text-[10px] uppercase italic p-4 outline-none focus:border-slate-900 focus:bg-white transition-all appearance-none cursor-pointer shadow-sm"
+              value={selectedPeriod.label}
+              onChange={(e) => setSelectedPeriod(periods.find(p => p.label === e.target.value)!)}
+            >
+              {periods.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
+            </select>
+            <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 group-hover:text-slate-900 transition-colors"><ChevronDown size={18}/></div>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
-        <div className="lg:col-span-8 space-y-12">
-          
-          {/* ACTION CARD */}
-          <div className="bg-white rounded-[4rem] p-16 shadow-2xl border border-slate-100 text-center space-y-12 relative overflow-hidden">
-             <div className={`absolute top-0 left-0 w-full h-6 transition-all duration-700 ${status === 'clocked_in' ? 'bg-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.4)]' : 'bg-slate-200'}`} />
-             
-             <div className="space-y-4">
-               <h2 className={`text-9xl font-black uppercase italic tracking-tighter transition-colors ${status === 'clocked_in' ? 'text-emerald-500' : 'text-slate-200'}`}>
-                 {status === 'clocked_in' ? 'Active' : 'Offline'}
-               </h2>
-               {status === 'clocked_in' && (
-                 <div className="flex items-center justify-center gap-3 text-blue-600 animate-in fade-in zoom-in duration-500">
-                   <Timer size={24} className="animate-pulse" />
-                   <span className="text-3xl font-black italic tracking-tight">{formatLiveTimer(liveElapsed)}</span>
-                 </div>
-               )}
-             </div>
-
-             <button 
-               onClick={handleClockAction} 
-               className={`w-full py-16 rounded-[3.5rem] font-black text-6xl uppercase italic shadow-2xl transition-all active:scale-95 hover:brightness-110 flex items-center justify-center gap-6
-                 ${status === 'clocked_in' ? 'bg-red-500 text-white shadow-red-200' : 'bg-blue-600 text-white shadow-blue-200'}`}
-             >
-               {status === 'clocked_in' ? <><LogOut size={48}/> End Shift</> : <><LogIn size={48}/> Start Shift</>}
-             </button>
+      {/* CLOCK CONTROL CARD */}
+      <div className="bg-white rounded-[3rem] border-2 border-slate-900 shadow-2xl overflow-hidden relative group">
+        <div className={`absolute top-0 left-0 w-2 h-full transition-colors duration-700 ${status === 'clocked_in' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+        <div className="p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="flex items-center gap-8">
+            <div className={`h-24 w-24 rounded-[2rem] flex items-center justify-center shadow-inner transition-all duration-500 ${status === 'clocked_in' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+              {status === 'clocked_in' ? <Zap size={40} className="animate-pulse" /> : <Clock size={40} />}
+            </div>
+            <div>
+              <h2 className="text-5xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">
+                {status === 'clocked_in' ? 'Active Duty' : 'Offline'}
+              </h2>
+            </div>
           </div>
+          <button 
+            onClick={handleClockAction}
+            className={`px-12 py-6 rounded-[2rem] font-black text-xl uppercase italic shadow-xl transition-all active:scale-95 flex items-center gap-4 ${
+              status === 'clocked_in' ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-900 text-white hover:bg-black'
+            }`}
+          >
+            {status === 'clocked_in' ? <><LogOut size={24}/> End Shift</> : <><LogIn size={24}/> Start Shift</>}
+          </button>
+        </div>
+      </div>
 
-          {/* CALENDAR */}
-          <div className="bg-white rounded-[4rem] p-12 border border-slate-100 shadow-2xl">
-            <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6 px-4">
-              <div className="flex items-center gap-4">
-                <div className="bg-slate-900 p-4 rounded-3xl text-white shadow-xl"><CalendarIcon size={28}/></div>
-                <h3 className="text-3xl font-black text-slate-900 uppercase italic tracking-tighter">Timecard History</h3>
-              </div>
-              <select 
-                className="bg-slate-50 border-2 border-slate-100 text-[11px] font-black uppercase tracking-widest p-5 rounded-[2rem] outline-none cursor-pointer hover:bg-slate-100 transition-all text-slate-600 appearance-none pr-12 bg-[url('https://cdn-icons-png.flaticon.com/512/60/60995.png')] bg-[length:12px] bg-[right_20px_center] bg-no-repeat"
-                value={selectedPeriod.label}
-                onChange={(e) => {
-                  setSelectedPeriod(periods.find(p => p.label === e.target.value)!);
-                  setSelectedDay(null);
-                }}
-              >
-                {periods.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
-              </select>
-            </div>
+      {/* STATS GRID - EXACT MATCH TO ADMIN */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-6">
+        <div className="bg-slate-50 p-6 rounded-[2.5rem] flex flex-col justify-between border-2 border-transparent hover:border-slate-200 transition-all">
+          <p className="text-[8px] font-black text-slate-400 uppercase italic mb-2 tracking-widest">Work Pay</p>
+          <p className="text-2xl font-black text-slate-900 italic tracking-tighter">${payrollSummary.workPay.toFixed(2)}</p>
+        </div>
+        <div className="bg-slate-50 p-6 rounded-[2.5rem] flex flex-col justify-between border-2 border-transparent hover:border-slate-200 transition-all">
+          <p className="text-[8px] font-black text-blue-600 uppercase italic mb-2 tracking-widest">Tips</p>
+          <p className="text-2xl font-black text-blue-600 italic tracking-tighter">${payrollSummary.tips.toFixed(2)}</p>
+        </div>
+        <div className="bg-slate-50 p-6 rounded-[2.5rem] flex flex-col justify-between border-2 border-transparent hover:border-slate-200 transition-all">
+          <p className="text-[8px] font-black text-orange-600 uppercase italic mb-2 tracking-widest">Refs</p>
+          <p className="text-2xl font-black text-orange-600 italic tracking-tighter">${payrollSummary.referralBonuses.toFixed(2)}</p>
+        </div>
+        <div className="bg-slate-900 p-6 rounded-[2.5rem] flex flex-col justify-between border-2 border-slate-800 shadow-xl">
+          <p className="text-[8px] font-black text-slate-500 uppercase italic mb-2 tracking-widest">PTO Balance</p>
+          <p className="text-2xl font-black text-white italic tracking-tighter">{employeeData.vacationBalance?.toFixed(2) || '0.00'}h</p>
+        </div>
+        <div className="bg-slate-900 p-6 rounded-[2.5rem] flex flex-col justify-between border-2 border-slate-800 shadow-xl">
+          <p className="text-[8px] font-black text-slate-500 uppercase italic mb-2 tracking-widest">Sick Balance</p>
+          <p className="text-2xl font-black text-white italic tracking-tighter">{employeeData.sickBalance?.toFixed(2) || '0.00'}h</p>
+        </div>
+      </div>
 
-            <div className="grid grid-cols-7 gap-6">
-              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-                <div key={d} className="text-center text-[11px] font-black text-slate-300 uppercase py-2 tracking-[0.3em] italic">{d}</div>
-              ))}
-              
-              {(() => {
-                const days = [];
-                const startDayNum = selectedPeriod.start.getDate();
-                const endDayNum = selectedPeriod.end.getDate();
-                
-                for (let s = 0; s < selectedPeriod.start.getDay(); s++) {
-                  days.push(<div key={`spacer-${s}`} className="aspect-square" />);
-                }
-                
-                for (let i = startDayNum; i <= endDayNum; i++) {
-                  const dateObj = new Date(selectedPeriod.start.getFullYear(), selectedPeriod.start.getMonth(), i);
-                  const dateStr = dateObj.toLocaleDateString();
-                  const hours = hoursByDate[dateStr] || 0;
-                  const isSelected = selectedDay === dateStr;
-                  const isToday = new Date().toLocaleDateString() === dateStr;
-
-                  days.push(
-                    <div 
-                      key={dateStr} 
-                      onClick={() => setSelectedDay(isSelected ? null : dateStr)} 
-                      className={`aspect-square rounded-[2.5rem] border-4 p-6 flex flex-col transition-all cursor-pointer group relative
-                        ${isSelected ? 'border-blue-600 bg-blue-50/20 scale-105 z-10 shadow-xl' : 
-                          hours > 6 ? 'border-emerald-500 bg-emerald-50/30' : 
-                          hours > 0 ? 'border-blue-400 bg-blue-50/30' : 
-                          'border-slate-50 hover:border-slate-200 bg-white'}`}
-                    >
-                      <span className={`text-lg font-black ${isToday ? 'text-blue-600 underline' : isSelected ? 'text-blue-600' : 'text-slate-300'}`}>{i}</span>
-                      {hours > 0 && (
-                        <div className="mt-auto text-center space-y-2">
-                          <p className="text-sm font-black text-slate-900 uppercase italic group-hover:scale-110 transition-transform">{formatTime(hours)}</p>
-                          <div className={`h-2.5 w-full rounded-full ${hours > 6 ? 'bg-emerald-500' : 'bg-blue-500'} shadow-sm`} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                return days;
-              })()}
-            </div>
+      {/* RECENT PUNCHES - MATCHING ADMIN EXPANDED VIEW */}
+      <div className="bg-white rounded-[3rem] border-2 border-slate-50 p-8 md:p-12 space-y-8">
+        <div className="flex justify-between items-center border-b border-slate-50 pb-6">
+          <h4 className="text-sm font-black uppercase italic text-slate-400 tracking-widest">Recent Punches</h4>
+          <div className="bg-slate-50 px-4 py-2 rounded-xl text-[10px] font-black text-slate-400 uppercase italic tracking-widest">
+            {payrollSummary.shifts.length} Records in Period
           </div>
         </div>
-
-        {/* SIDEBAR */}
-        <div className="lg:col-span-4 space-y-10">
-          <div className="bg-slate-900 rounded-[4rem] p-12 text-white shadow-2xl relative overflow-hidden group border border-slate-800">
-            <Zap className="absolute -right-8 -top-8 text-white/5 w-56 h-56 rotate-12 group-hover:scale-110 group-hover:text-blue-500/10 transition-all duration-1000" />
-            <div className="relative z-10 space-y-8">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-600 p-2 rounded-xl"><History size={18}/></div>
-                <p className="text-[11px] font-black text-blue-400 uppercase tracking-[0.4em] italic">Period Recap</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest italic">Total Hours Worked</p>
-                <h4 className="text-7xl font-black italic tracking-tighter text-white">
-                  {formatTime(history.reduce((a, s) => a + (s.totalHours || 0), 0))}
-                </h4>
-              </div>
+        
+        <div className="space-y-2">
+          {payrollSummary.shifts.length === 0 ? (
+            <div className="py-20 text-center flex flex-col items-center gap-4">
+              <Activity className="text-slate-100" size={48} />
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-300 italic leading-none">No intelligence logs found for this period</p>
             </div>
-          </div>
-
-          <div className="space-y-8 px-2">
-            <div className="flex items-center justify-between">
-               <div className="flex flex-col">
-                  <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] italic">{selectedDay ? 'Reviewing Day' : 'Punch Details'}</h3>
-                  {selectedDay && <p className="text-xl font-black text-blue-600 italic leading-none mt-2">{selectedDay}</p>}
-               </div>
-               {selectedDay && (
-                 <button onClick={() => setSelectedDay(null)} className="text-[10px] font-black bg-blue-600 text-white px-5 py-2.5 rounded-full uppercase italic shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center gap-2">
-                   <RefreshCcw size={14}/> Reset
-                 </button>
-               )}
-            </div>
-            
-            <div className="space-y-6 max-h-[700px] overflow-y-auto pr-4 custom-scrollbar">
-              {filteredHistory.length === 0 ? (
-                <div className="py-32 text-center space-y-4 bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
-                  <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.4em] italic">No Punches Logged</p>
+          ) : payrollSummary.shifts.map((punch: any) => (
+            <div key={punch.id} className="grid grid-cols-7 gap-2 items-center p-4 rounded-[1.5rem] hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group">
+              <div className="col-span-2 flex items-center gap-4">
+                <div className={`w-2 h-2 rounded-full ${punch.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-200'}`} />
+                <p className="text-xs font-black text-slate-900 italic tracking-tighter">{punch.startTime?.toDate().toLocaleDateString()}</p>
+              </div>
+              <p className="text-xs font-bold text-slate-400">{punch.startTime?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+              <p className="text-xs font-bold text-slate-400">{punch.endTime ? punch.endTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
+              <p className="text-xs font-black text-slate-900 italic">{punch.totalHours?.toFixed(2) || '0.00'}h</p>
+              <p className={`text-[9px] font-black uppercase text-left italic ${punch.type === 'work' ? 'text-slate-300' : 'text-blue-600'}`}>
+                {punch.type?.replace('_', ' ') || 'work'}
+              </p>
+              <div className="flex justify-end pr-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-100 text-slate-300">
+                  <Clock size={14} />
                 </div>
-              ) : (
-                filteredHistory.map((shift) => (
-                  <div key={shift.id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-xl space-y-6 transition-all hover:scale-[1.02] hover:shadow-2xl">
-                    <div className="flex justify-between items-center border-b border-slate-50 pb-6">
-                      <div className="flex flex-col">
-                        <p className="text-[10px] font-black text-slate-400 uppercase italic mb-1">Shift Date</p>
-                        <p className="text-lg font-black text-slate-900 italic">{shift.date}</p>
-                      </div>
-                      <div className={`px-6 py-2.5 rounded-2xl text-xs font-black italic uppercase shadow-sm ${shift.status === 'active' ? 'bg-emerald-100 text-emerald-600 animate-pulse' : 'bg-slate-900 text-white'}`}>
-                        {shift.status === 'active' ? '● Live' : formatTime(shift.totalHours || 0)}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-8">
-                      <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
-                        <p className="text-[10px] font-black text-emerald-500 uppercase italic mb-2 tracking-widest">Clock In</p>
-                        <p className="text-xl font-black text-slate-800 italic">{shift.startTime?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                      </div>
-                      <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
-                        <p className="text-[10px] font-black text-red-500 uppercase italic mb-2 tracking-widest">Clock Out</p>
-                        <p className="text-xl font-black text-slate-800 italic">{shift.endTime ? shift.endTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}</p>
-                      </div>
-                    </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* FOOTER - EXACT MATCH TO ADMIN */}
+        <div className="flex items-center justify-between gap-6 pt-10 border-t border-slate-100">
+          <div className="flex gap-12">
+            <div>
+              <p className="text-[8px] font-black text-slate-400 uppercase italic mb-1 tracking-widest leading-none">Net Hours</p>
+              <p className="text-2xl font-black text-slate-900 italic tracking-tighter">{formatPreciseTime(payrollSummary.totalPaidHours)}</p>
+            </div>
+            <div>
+              <p className="text-[8px] font-black text-slate-400 uppercase italic mb-1 tracking-widest leading-none">Total Payout</p>
+              <p className="text-2xl font-black text-blue-600 italic tracking-tighter">${payrollSummary.grossPay.toFixed(2)}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowPayStub(true)}
+            className="px-10 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase italic flex items-center gap-3 hover:scale-105 hover:bg-black transition-all shadow-xl shadow-slate-900/20"
+          >
+            <Receipt size={18} className="text-blue-400" /> 
+            View Pay Stub
+          </button>
+        </div>
+      </div>
+
+      {/* PAY STUB MODAL - EXACT MATCH TO ADMIN */}
+      {showPayStub && (
+        <div className="fixed inset-0 bg-white/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[3rem] max-w-2xl w-full p-8 md:p-12 shadow-2xl border border-slate-50 relative overflow-y-auto max-h-[90vh]">
+            <button onClick={() => setShowPayStub(false)} className="absolute top-8 right-8 text-slate-200 hover:text-slate-900 p-2 transition-all hover:rotate-90"><X size={32}/></button>
+            <div className="mb-8 border-b-4 border-slate-900 pb-8">
+              <h2 className="text-3xl font-black uppercase italic text-slate-900 tracking-tighter leading-none mb-4">Earnings <br/><span className="text-slate-200">Statement.</span></h2>
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.4em] italic leading-none">Clear View LLC</p>
+            </div>
+            <div className="mb-12 leading-none text-left">
+              <p className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter">{employeeData.name}</p>
+              <p className="text-[10px] font-bold text-slate-300 lowercase italic">{employeeData.email}</p>
+            </div>
+            <div className="space-y-8">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left">
+                    <th className="py-3 text-[9px] font-black uppercase text-slate-400 tracking-widest italic">Description</th>
+                    <th className="text-center py-3 text-[9px] font-black uppercase text-slate-400 tracking-widest italic">Hours</th>
+                    <th className="text-center py-3 text-[9px] font-black uppercase text-slate-400 tracking-widest italic">Rate</th>
+                    <th className="text-right py-3 text-[9px] font-black uppercase text-slate-400 tracking-widest italic">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {payrollSummary.lineItems.map((group: any, idx: number) => (
+                    <tr key={idx}>
+                      <td className={`py-5 text-xs font-black uppercase italic tracking-tighter text-left ${group.type === 'work' ? 'text-slate-900' : 'text-blue-600'}`}>
+                        {group.type === 'work' ? 'Hours Worked' : group.type === 'vacation' ? 'Paid Vacation (PTO)' : 'Paid Sick Time'} <br/>
+                        <span className="text-[9px] font-black uppercase tracking-widest not-italic text-slate-900">[{group.dateRange}]</span>
+                      </td>
+                      <td className="py-5 text-center text-xs font-black text-slate-900 italic tracking-tighter">{group.hours.toFixed(2)}h</td>
+                      <td className="py-5 text-center text-xs font-black text-slate-900 italic tracking-tighter">${group.rate.toFixed(2)}</td>
+                      <td className="py-5 text-right text-xs font-black text-slate-900 italic tracking-tighter">${group.pay.toFixed(2)}</td>
+                    </tr>
+                  ))}
+
+                  {payrollSummary.tips > 0 && (
+                    <tr>
+                      <td className="py-5 text-xs font-black text-blue-600 uppercase italic tracking-tighter text-left">Gratuity</td>
+                      <td colSpan={2} className="text-center text-xs text-slate-300">—</td>
+                      <td className="py-5 text-right text-xs font-black text-blue-600 italic tracking-tighter">${payrollSummary.tips.toFixed(2)}</td>
+                    </tr>
+                  )}
+                  {payrollSummary.referralBonuses > 0 && (
+                    <tr>
+                      <td className="py-5 text-xs font-black text-orange-600 uppercase italic tracking-tighter text-left">Referral</td>
+                      <td colSpan={2} className="text-center text-xs text-slate-300">—</td>
+                      <td className="py-5 text-right text-xs font-black text-orange-600 italic tracking-tighter">${payrollSummary.referralBonuses.toFixed(2)}</td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-4 border-slate-900">
+                    <td colSpan={3} className="py-6 text-sm font-black text-slate-900 uppercase italic tracking-widest text-left">Total Net Payout</td>
+                    <td className="py-6 text-2xl font-black text-slate-900 text-right italic tracking-tighter">${payrollSummary.grossPay.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 flex flex-col gap-4 shadow-inner text-left">
+                  <div className="flex justify-between items-center"><span className="text-[8px] font-black uppercase text-slate-400 italic">Accrued This Period</span><p className="text-[8px] font-black text-slate-300 italic uppercase">1h per 40h worked</p></div>
+                  <div className="flex gap-8">
+                    <div className="space-y-1"><p className="text-[7px] font-black text-slate-400 uppercase italic text-left">Sick</p><p className="text-lg font-black text-slate-900 italic tracking-tighter text-left">+{payrollSummary.sickAccrued.toFixed(2)}h</p></div>
+                    <div className="space-y-1"><p className="text-[7px] font-black text-slate-400 uppercase italic text-left">PTO</p><p className="text-lg font-black text-slate-900 italic tracking-tighter text-left">+{payrollSummary.ptoAccrued.toFixed(2)}h</p></div>
                   </div>
-                ))
-              )}
+                </div>
+                <div className="bg-slate-900 p-6 rounded-[2rem] flex flex-col gap-4 shadow-xl text-left">
+                  <span className="text-[8px] font-black uppercase text-slate-500 italic">Remaining Balance (Current)</span>
+                  <div className="flex gap-8">
+                    <div className="space-y-1"><p className="text-[7px] font-black text-slate-500 uppercase italic text-left">Sick</p><p className="text-lg font-black text-white italic tracking-tighter text-left">{employeeData.sickBalance?.toFixed(2) || '0.00'}h</p></div>
+                    <div className="space-y-1"><p className="text-[7px] font-black text-slate-500 uppercase italic text-left">PTO</p><p className="text-lg font-black text-white italic tracking-tighter text-left">{employeeData.vacationBalance?.toFixed(2) || '0.00'}h</p></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
+  );
+}
+
+// Add ChevronDown to imports if not already there
+function ChevronDown({ size }: { size: number }) {
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
   );
 }

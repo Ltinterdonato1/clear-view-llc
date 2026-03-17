@@ -72,6 +72,20 @@ exports.createStaffAccount = onCall(async (request) => {
   return { success: true };
 });
 
+exports.updateStaffPassword = onCall(async (request) => {
+  const { uid, newPassword } = request.data;
+  if (!uid || !newPassword) {
+    throw new HttpsError("invalid-argument", "Missing UID or password.");
+  }
+  try {
+    await admin.auth().updateUser(uid, { password: newPassword });
+    return { success: true };
+  } catch (error) {
+    console.error("Auth Update Error:", error);
+    throw new HttpsError("internal", error.message);
+  }
+});
+
 // --- 3. SMS Logic ---
 exports.sendSmsOnRequest = onDocumentCreated("sms_messages/{docId}", async (event) => {
   const data = event.data.data();
