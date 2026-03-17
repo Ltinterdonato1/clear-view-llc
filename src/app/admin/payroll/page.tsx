@@ -508,7 +508,7 @@ export default function UnifiedPayrollStaff() {
                                 onCancel={() => setIsAddingPunch(false)}
                               />;
                             })() : (null)}
-                            ) : (null)}
+                            ) : (null)
                             {expandedPunches.map(punch => {
                               const isSelf = currentUser?.email === emp.email;
 
