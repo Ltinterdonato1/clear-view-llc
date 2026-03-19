@@ -40,8 +40,7 @@ export default function ManualBooking() {
     mossAcidWash: false,
     sidingCleaning: false,
     trexWash: false,
-    trexDeckSize: 'none
-    ',
+    trexDeckSize: 'none',
     cedarFenceRestoration: false,
     fenceSize: 'none',
     backPatio: false,
