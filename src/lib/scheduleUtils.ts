@@ -316,12 +316,17 @@ export const calculateJobStats = (jobData: any) => {
   if (jobData.hasEarnedReferralReward) { const reward = finalTotal * 0.10; finalTotal -= reward; discounts.push({ name: "Referral Reward (10%)", amount: reward }); }
   if (jobData.militaryDiscount) { const mil = finalTotal * 0.10; finalTotal -= mil; discounts.push({ name: "Military Discount (10%)", amount: mil }); }
 
+  let daysRequired = Math.ceil(totalMinutes / 540);
+  if (jobData.mode === 'split' && daysRequired < 2) {
+    daysRequired = 2;
+  }
+
   return { 
     total: finalTotal.toFixed(2), timeDisplay: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
     srv, lineItems, serviceJobs, discounts, totalMinutes, bundleSavings: bundleSavings.toFixed(2), manualCredit: referralCredit.toFixed(2),
     savings: (bundleSavings + referralCredit + (jobData.militaryDiscount ? finalTotal * 0.10 : 0)).toFixed(2),
     discountRate: (coreDiscountRate * 100).toFixed(0),
-    daysRequired: Math.ceil(totalMinutes / 540), referralBonus: ((totalBase - bundleSavings) * 0.10).toFixed(2)
+    daysRequired, referralBonus: ((totalBase - bundleSavings) * 0.10).toFixed(2)
   };
 };
 

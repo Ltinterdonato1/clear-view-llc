@@ -56,6 +56,9 @@ const initialFormData: FormData = {
   deluxeGutter: false,
   gutterFlush: false,
   actualBookedDays: [],
+  renewalFrequency: null,
+  referralCount: 0,
+  isReturningCustomer: false,
 };
 
 interface QuoteModalProps {
@@ -77,6 +80,50 @@ export default function QuoteModal({ isOpen, onClose, isEmployeeBooking = false,
       setFormData(prev => ({ ...prev, ...prefillData }));
     }
   }, [prefillData]);
+
+  // Detection logic for returning customers and referrals
+  useEffect(() => {
+    const detectCustomerProfile = async () => {
+        if (formData.email || (formData.firstName && formData.lastName)) {
+            const leadsRef = collection(db, "leads");
+            let q;
+            if (formData.email) {
+                q = query(leadsRef, where("email", "==", formData.email.toLowerCase().trim()));
+            } else {
+                q = query(leadsRef, where("firstName", "==", formData.firstName.trim()), where("lastName", "==", formData.lastName.trim()));
+            }
+
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                const history = snap.docs.map(d => d.data());
+                const firstWithRenewal = history.find(h => h.renewalFrequency);
+                
+                // Count referrals given by this customer
+                const allLeadsQuery = query(collection(db, "leads"));
+                const allSnap = await getDocs(allLeadsQuery);
+                const email = formData.email?.toLowerCase().trim();
+                const fullName = `${formData.firstName} ${formData.lastName}`.toLowerCase().trim();
+                
+                const referrals = allSnap.docs.filter(d => {
+                    const data = d.data();
+                    return data.referralSourceEmail?.toLowerCase().trim() === email || 
+                           data.referralSourceName?.toLowerCase().trim() === fullName;
+                }).length;
+
+                setFormData(prev => ({
+                    ...prev,
+                    isReturningCustomer: true,
+                    renewalFrequency: firstWithRenewal?.renewalFrequency || null,
+                    referralCount: referrals
+                }));
+            }
+        }
+    };
+
+    if (step === 2) { // Trigger detection when moving to service step
+        detectCustomerProfile();
+    }
+  }, [step, formData.email, formData.firstName, formData.lastName]);
 
   useEffect(() => {
     const fetchBookedDates = async () => {

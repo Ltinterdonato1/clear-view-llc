@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ArrowRight, Droplets, Sparkles, Wind, MapPin, Waves, Users } from 'lucide-react';
+import { ChevronLeft, ArrowRight, Droplets, Sparkles, Wind, MapPin, Waves, Users, Star, RefreshCw } from 'lucide-react';
 import { format, isValid, addDays, startOfDay, eachDayOfInterval } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { collection, query, getDocs, orderBy } from 'firebase/firestore';
@@ -46,7 +46,7 @@ export default function FinalReview({ formData, setFormData, stats, onNext, onBa
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto py-4">
+    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto py-4 text-left">
       {/* TOP NAVIGATION */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-300 italic">Step 4 of 4 • Final Review</span>
@@ -79,6 +79,22 @@ export default function FinalReview({ formData, setFormData, stats, onNext, onBa
                   </p>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{formData.email} • {formData.phone}</p>
                 </div>
+                
+                {/* LOYALTY BADGES */}
+                {(formData.referralCount > 0 || formData.renewalFrequency) && (
+                    <div className="flex flex-wrap gap-2 mt-4">
+                        {formData.referralCount > 0 && (
+                            <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest italic border border-emerald-100 shadow-sm">
+                                <Star size={10} fill="currentColor" /> {formData.referralCount} Referrals Detected
+                            </div>
+                        )}
+                        {formData.renewalFrequency && (
+                            <div className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest italic border border-blue-100 shadow-sm">
+                                <RefreshCw size={10} /> {formData.renewalFrequency} Month Renewal active
+                            </div>
+                        )}
+                    </div>
+                )}
               </div>
             </div>
           </div>
@@ -120,7 +136,7 @@ export default function FinalReview({ formData, setFormData, stats, onNext, onBa
               </div>
 
               {/* Day 2 (if required) */}
-              {stats.daysRequired >= 2 && (
+              {Math.max(stats.daysRequired, formData.mode === 'split' ? 2 : 1) >= 2 && (
                 <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 flex justify-between items-center group">
                   <div>
                     <p className="text-[8px] font-black text-blue-600 uppercase italic mb-1">Day 2</p>

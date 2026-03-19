@@ -22,7 +22,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         router.push('/login');
       } else {
         const userEmail = user.email?.toLowerCase() || '';
-        
+
         if (userEmail === 'clearview3cleaners@gmail.com') {
           setUserName('Admin');
           setStatus('clocked_in');
@@ -57,7 +57,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full py-10 px-6 text-left">
-      {/* BRANDING - STACKED NAME THEN CLEAR VIEW LLC */}
+      {/* BRANDING */}
       <div className="mb-16 px-6 space-y-1">
         <p className="font-black text-2xl tracking-tighter text-slate-900 leading-none uppercase italic">{userName || 'Crew'}</p>
         <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">Clear View LLC</p>
@@ -119,7 +119,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-left overflow-x-hidden">
-      
+
       {/* MOBILE HEADER */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-24 bg-white/80 backdrop-blur-xl border-b border-slate-100 z-[60] flex items-center justify-between px-8">
         <div className="flex flex-col">
@@ -163,3 +163,4 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
     </div>
   );
 }
+

@@ -83,7 +83,22 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM STRIP */}
-        <div className="pt-12 border-t border-slate-100 text-center">
+        <div className="pt-12 border-t border-slate-100 text-center space-y-6">
+          <div className="flex justify-center">
+            <div className="w-12 h-12 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100 shadow-sm group hover:bg-black hover:border-black transition-all duration-500 cursor-pointer" onClick={scrollToTop}>
+              <svg 
+                viewBox="0 0 24 24" 
+                className="w-8 h-8 fill-none stroke-slate-900 group-hover:stroke-white transition-colors duration-500" 
+                strokeWidth="1.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M3 20L9 6L13 14L17 10L21 20H3Z" />
+                <path d="M9 6L11 10" />
+                <path d="M17 10L15 14" />
+              </svg>
+            </div>
+          </div>
           <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em]">
             © {currentYear} CLEAR VIEW LLC
           </p>

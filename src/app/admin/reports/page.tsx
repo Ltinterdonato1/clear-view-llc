@@ -1,119 +1,171 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '../../../lib/firebase';
-import { collection, query, where, getDocs, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
-import { 
-  TrendingUp, Briefcase, Loader2, MapPin, Receipt, ArrowRight, BarChart3, 
-  UserCheck, CreditCard, Banknote, CheckSquare, Sparkles, Search, User, Phone, Mail,
-  ShieldCheck, X, Edit2, Trash2, Save, Wallet, UserPlus, Check, Users, ChevronDown, Calendar
-} from 'lucide-react';
+import { db, auth } from '../../../lib/firebase'; 
+import { collection, query, onSnapshot, getDocs, orderBy, doc, deleteDoc, updateDoc, where, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { 
+  Users, User, Search, Phone, Mail, MapPin, 
+  ChevronDown, Calendar, Receipt, DollarSign, 
+  TrendingUp, Activity, ArrowRight, Loader2, X, Trash2, Save, Check, Plus, RefreshCw, Star, Clock, Banknote
+} from 'lucide-react';
 import CustomerInquiryModal from '../../../components/CustomerInquiryModal';
 
-export default function ReportsPage() {
+export default function AdminReports() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'financials' | 'customers'>('financials');
-  
-  // Data State
-  const [allLeads, setAllLeads] = useState<any[]>([]);
-  const [allEmployees, setAllEmployees] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'reports' | 'directory'>('reports');
+  const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // UI State
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [expandedCustomerId, setExpandedCustomerId] = useState<string | null>(null);
   const [editingLead, setEditingLead] = useState<any | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [expandedCustomerId, setExpandedCustomerId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const qLeads = query(
-      collection(db, "leads"), 
-      orderBy("createdAt", "desc")
-    );
-    const unsubLeads = onSnapshot(qLeads, (snap) => {
-      setAllLeads(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) router.push('/login');
+    });
+
+    const q = query(collection(db, "leads"), orderBy("createdAt", "desc"));
+    const unsubscribeLeads = onSnapshot(q, (snap) => {
+      setJobs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
 
-    const unsubEmp = onSnapshot(collection(db, "employees"), (snap) => {
-      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setAllEmployees(docs);
-    });
+    return () => { unsubscribeAuth(); unsubscribeLeads(); };
+  }, [router]);
 
-    return () => { unsubLeads(); unsubEmp(); };
-  }, []);
-
-  // --- FINANCIALS DATA (COMPLETED ONLY) ---
-  const archivedLeads = useMemo(() => {
-    return allLeads.filter(d => ["Archived", "Completed", "completed"].includes(d.status));
-  }, [allLeads]);
-
+  // --- STATISTICS CALCULATION ---
   const stats = useMemo(() => {
-    const total = archivedLeads.reduce((sum, lead) => {
-      const cleanPrice = parseFloat(lead.total || lead.finalPrice || '0');
-      return sum + (isNaN(cleanPrice) ? 0 : cleanPrice);
-    }, 0);
-    return {
-      totalRevenue: total,
-      totalJobs: archivedLeads.length,
-      avgJobValue: archivedLeads.length > 0 ? total / archivedLeads.length : 0
-    };
-  }, [archivedLeads]);
-
-  // --- CUSTOMER INTELLIGENCE (ALL UNIQUE PROFILES) ---
-  const uniqueCustomers = useMemo(() => {
-    const groups: Record<string, any> = {};
+    const completed = jobs.filter(j => j.status === 'Archived' || j.status === 'Completed');
+    const revenue = completed.reduce((sum, j) => sum + (parseFloat(j.total || j.finalPrice || j.template?.data?.totalAmount || '0')), 0);
+    const avgTicket = completed.length > 0 ? revenue / completed.length : 0;
     
-    allLeads.forEach(lead => {
-      if (lead.hideFromCustomersPage) return; // Skip hidden leads
-      
-      const name = (lead.template?.data?.fullName || `${lead.firstName || ''} ${lead.lastName || ''}`).trim() || 'New Customer';
-      const key = `${name.toLowerCase()}-${(lead.phone || '').replace(/\D/g,'')}`;
-      
-      if (!groups[key]) {
-        groups[key] = { 
-          ...lead, 
-          displayName: name, 
-          groupKey: key, 
-          totalRewards: Number(lead.referralRewardBalance || 0), 
-          allIds: [lead.id],
-          jobs: [lead]
-        };
+    const now = new Date();
+    const thisMonth = completed.filter(j => {
+      const d = j.completedAt ? new Date(j.completedAt) : null;
+      return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    
+    return {
+      totalRevenue: revenue,
+      totalJobs: jobs.length,
+      completedJobs: completed.length,
+      avgTicket,
+      thisMonthRevenue: thisMonth.reduce((sum, j) => sum + (parseFloat(j.total || j.finalPrice || j.template?.data?.totalAmount || '0')), 0)
+    };
+  }, [jobs]);
+
+  // --- DIRECTORY LOGIC ---
+  const uniqueCustomers = useMemo(() => {
+    const map = new Map();
+    
+    jobs.forEach(j => {
+      if (j.isNotification) return;
+      if (j.hideFromCustomersPage) return;
+
+      const key = (j.email || j.phone || `${j.firstName}-${j.lastName}`).toLowerCase().trim();
+      const revenue = parseFloat(j.total || j.finalPrice || j.template?.data?.totalAmount || '0');
+
+      if (!map.has(key)) {
+        map.set(key, {
+          ...j,
+          groupKey: key,
+          displayName: j.template?.data?.fullName || `${j.firstName} ${j.lastName}`,
+          jobCount: 1,
+          lifetimeValue: revenue,
+          renewalFrequency: j.renewalFrequency || null,
+          referralCount: 0,
+          leadIds: [j.id],
+          lastServiceDate: j.completedAt || j.selectedDate || j.createdAt
+        });
       } else {
-        groups[key].allIds.push(lead.id);
-        groups[key].totalRewards += Number(lead.referralRewardBalance || 0);
-        groups[key].jobs.push(lead);
-        if (!groups[key].email && lead.email) groups[key].email = lead.email;
-        if (!groups[key].address && lead.address) groups[key].address = lead.address;
+        const existing = map.get(key);
+        existing.jobCount += 1;
+        existing.lifetimeValue += revenue;
+        existing.leadIds.push(j.id);
+        if (j.renewalFrequency && !existing.renewalFrequency) {
+            existing.renewalFrequency = j.renewalFrequency;
+        }
+        // Update last service date if this lead is newer
+        const currentLast = new Date(existing.lastServiceDate?.toDate?.() || existing.lastServiceDate).getTime();
+        const thisLeadDate = new Date(j.completedAt || j.selectedDate?.toDate?.() || j.selectedDate || j.createdAt?.toDate?.() || j.createdAt).getTime();
+        if (thisLeadDate > currentLast) {
+            existing.lastServiceDate = j.completedAt || j.selectedDate || j.createdAt;
+        }
       }
     });
-    return Object.values(groups);
-  }, [allLeads]);
 
-  const filteredCustomers = uniqueCustomers.filter(cust => {
-    const search = searchQuery.toLowerCase();
-    return cust.displayName.toLowerCase().includes(search) || 
-           (cust.phone || '').includes(search) || 
-           (cust.email || '').toLowerCase().includes(search) ||
-           (cust.address || '').toLowerCase().includes(search);
+    // Calculate Referral Counts
+    jobs.forEach(j => {
+        if (j.referralSourceEmail) {
+            const refKey = j.referralSourceEmail.toLowerCase().trim();
+            if (map.has(refKey)) {
+                map.get(refKey).referralCount += 1;
+            }
+        } else if (j.referralSourceName) {
+            const refName = j.referralSourceName.toLowerCase().trim();
+            for (let cust of map.values()) {
+                if (cust.displayName.toLowerCase().trim() === refName) {
+                    cust.referralCount += 1;
+                    break;
+                }
+            }
+        }
+    });
+
+    return Array.from(map.values());
+  }, [jobs]);
+
+  const filteredCustomers = uniqueCustomers.filter(c => {
+    const s = searchQuery.toLowerCase();
+    return c.displayName.toLowerCase().includes(s) || 
+           (c.phone || '').includes(s) || 
+           (c.email || '').toLowerCase().includes(s) ||
+           (c.address || '').toLowerCase().includes(s);
   });
+
+  const updateRenewalFrequency = async (cust: any, freq: number | null) => {
+    setIsUpdating(true);
+    try {
+        for (const leadId of cust.leadIds) {
+            await updateDoc(doc(db, "leads", leadId), { renewalFrequency: freq });
+        }
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 2000);
+    } catch (err) { console.error(err); }
+    finally { setIsUpdating(false); }
+  };
+
+  const formatDate = (dateInput: any) => {
+    if (!dateInput) return 'N/A';
+    try {
+        const d = new Date(dateInput?.toDate ? dateInput.toDate() : dateInput);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+        return 'N/A';
+    }
+  };
 
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingLead) return;
     setIsUpdating(true);
     try {
-      await updateDoc(doc(db, "leads", editingLead.id), {
-        firstName: editingLead.firstName || '',
-        lastName: editingLead.lastName || '',
-        email: editingLead.email || '',
-        phone: editingLead.phone || '',
-        address: editingLead.address || '',
-        city: editingLead.city || ''
-      });
+      const updates = {
+        firstName: editingLead.firstName,
+        lastName: editingLead.lastName,
+        email: editingLead.email,
+        phone: editingLead.phone
+      };
+
+      for (const leadId of editingLead.leadIds) {
+        await updateDoc(doc(db, "leads", leadId), updates);
+      }
+
       setShowSuccess(true);
       setTimeout(() => { setShowSuccess(false); setEditingLead(null); }, 2000);
     } catch (err) { console.error(err); }
@@ -121,181 +173,131 @@ export default function ReportsPage() {
   };
 
   const softDeleteClient = async (cust: any) => {
+    if (!window.confirm("Archive this client directory entry? This will hide them from the registry but keep their job history.")) return;
     setRemovingId(cust.groupKey);
     try {
-      const batch = writeBatch(db);
-      for (const id of cust.allIds) {
-        batch.set(doc(db, "leads", id), { hideFromCustomersPage: true }, { merge: true });
-      }
-      await batch.commit();
-    } catch (error) {
-      console.error("Removal failed:", error);
-    } finally {
-      setRemovingId(null);
-    }
+        for (const leadId of cust.leadIds) {
+            await updateDoc(doc(db, "leads", leadId), { hideFromCustomersPage: true });
+        }
+    } catch (err) { console.error(err); }
+    finally { setRemovingId(null); }
   };
 
   const hardDeleteClient = async (cust: any) => {
+    if (!window.confirm("DANGER: This will permanently delete ALL job history and records for this customer. This cannot be undone. Proceed?")) return;
     setRemovingId(cust.groupKey);
     try {
-      const batch = writeBatch(db);
-      for (const id of cust.allIds) {
-        batch.delete(doc(db, "leads", id));
-      }
-      await batch.commit();
-    } catch (error) {
-      console.error("Hard delete failed:", error);
-    } finally {
-      setRemovingId(null);
-    }
+        for (const leadId of cust.leadIds) {
+            await deleteDoc(doc(db, "leads", leadId));
+        }
+    } catch (err) { console.error(err); }
+    finally { setRemovingId(null); }
   };
 
   const navigateToSchedule = (cust: any) => {
-    const sortedJobs = [...cust.jobs].sort((a, b) => {
-      const dateA = a.selectedDate?.toDate?.() || new Date(a.selectedDate || 0);
-      const dateB = b.selectedDate?.toDate?.() || new Date(b.selectedDate || 0);
-      return dateB.getTime() - dateA.getTime();
-    });
-
-    const targetJob = sortedJobs.find(j => j.selectedDate);
-    if (targetJob) {
-      const d = targetJob.selectedDate?.toDate?.() || new Date(targetJob.selectedDate);
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      router.push(`/admin/schedule?date=${dateStr}&highlight=${targetJob.id}`);
+    const latestId = cust.leadIds[0];
+    const latest = jobs.find(j => j.id === latestId);
+    if (latest && latest.selectedDate) {
+        const d = latest.selectedDate.toDate?.() || new Date(latest.selectedDate);
+        router.push(`/admin/schedule?date=${d.toISOString().split('T')[0]}&highlight=${latest.id}`);
     } else {
-      router.push('/admin/schedule');
+        router.push('/admin/schedule');
     }
   };
 
-  const getPaymentIcon = (method: string) => {
-    const m = method?.toLowerCase() || '';
-    if (m.includes('card')) return <CreditCard size={12} className="text-blue-500" />;
-    if (m.includes('cash')) return <Banknote size={12} className="text-emerald-500" />;
-    if (m.includes('check')) return <Receipt size={12} className="text-orange-500" />;
-    return <Wallet size={12} className="text-slate-300" />;
-  };
+  if (loading) return (
+    <div className="h-screen flex flex-col items-center justify-center bg-white space-y-6">
+      <Loader2 className="animate-spin text-slate-200" size={64} />
+      <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-300 italic">Compiling Intelligence...</p>
+    </div>
+  );
 
   return (
-    <div className="p-4 sm:p-8 lg:p-12 xl:p-16 space-y-10 max-w-[1600px] mx-auto min-h-screen bg-white text-left font-sans text-slate-900">
+    <div className="p-4 md:p-8 lg:p-12 xl:p-16 space-y-12 max-w-[1600px] mx-auto min-h-screen bg-white text-left font-sans text-slate-900">
       
-      {/* TAB SWITCHER */}
-      <div className="flex justify-between items-center border-b border-slate-100 pb-8 text-left">
-        <div className="flex items-center gap-6 text-left">
-          <div className="flex items-center gap-2 text-left">
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row justify-between items-center border-b border-slate-100 pb-12 gap-8">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
             <button 
-              onClick={() => setActiveTab('financials')}
-              className={`p-4 rounded-2xl transition-all ${activeTab === 'financials' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-200 hover:text-slate-400 hover:bg-slate-50'}`}
+              onClick={() => setActiveTab('reports')}
+              className={`p-4 rounded-2xl transition-all ${activeTab === 'reports' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-200 hover:text-slate-400 hover:bg-slate-50'}`}
             >
-              <BarChart3 size={24} />
+              <TrendingUp size={24} />
             </button>
-            <span className={`text-xl font-black uppercase italic tracking-tighter transition-colors duration-500 ${activeTab === 'financials' ? 'text-slate-900' : 'text-slate-200'}`}>Report</span>
+            <span className={`text-xl font-black uppercase italic tracking-tighter transition-colors duration-500 ${activeTab === 'reports' ? 'text-slate-900' : 'text-slate-200'}`}>Reports</span>
           </div>
           
-          <div className="flex items-center gap-2 text-left">
+          <div className="flex items-center gap-2">
             <button 
-              onClick={() => setActiveTab('customers')}
-              className={`p-4 rounded-2xl transition-all ${activeTab === 'customers' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-200 hover:text-slate-400 hover:bg-slate-50'}`}
+              onClick={() => setActiveTab('directory')}
+              className={`p-4 rounded-2xl transition-all ${activeTab === 'directory' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-200 hover:text-slate-400 hover:bg-slate-50'}`}
             >
               <Users size={24} />
             </button>
-            <span className={`text-xl font-black uppercase italic tracking-tighter transition-colors duration-500 ${activeTab === 'customers' ? 'text-slate-900' : 'text-slate-200'}`}>Customers</span>
+            <span className={`text-xl font-black uppercase italic tracking-tighter transition-colors duration-500 ${activeTab === 'directory' ? 'text-slate-900' : 'text-slate-200'}`}>Directory</span>
           </div>
         </div>
-        
-        {activeTab === 'customers' && (
-          <button onClick={() => setShowAddModal(true)} className="px-8 py-4 bg-slate-900 text-white rounded-[1.5rem] font-black uppercase italic text-[9px] tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95 leading-none">
-            <UserPlus size={14} /> Add Client
-          </button>
+
+        {activeTab === 'directory' && (
+            <button 
+                onClick={() => setShowAddModal(true)}
+                className="group px-8 py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-xl hover:scale-105"
+            >
+                <Plus size={16} className="group-hover:rotate-90 transition-transform"/>
+                Add Customer
+            </button>
         )}
       </div>
 
-      {loading ? (
-        <div className="py-48 text-center flex flex-col items-center gap-6">
-          <Loader2 className="animate-spin text-slate-200" size={64} />
-          <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-300 italic">Reading Ledgers...</p>
-        </div>
-      ) : (
-        <div className="animate-in fade-in duration-700 text-left">
-          {activeTab === 'financials' ? (
-            <div className="space-y-12 text-left">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-10 text-left">
-                <div className="bg-white border-2 border-slate-100 rounded-[2.5rem] md:rounded-[4rem] p-8 md:p-12 text-slate-900 shadow-2xl relative overflow-hidden group text-left">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full blur-3xl -mr-32 -mt-32 transition-transform duration-1000 group-hover:scale-110"></div>
-                  <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.4em] mb-4 italic leading-none text-left">Revenue</p>
-                  <h4 className="text-4xl sm:text-5xl lg:text-6xl font-black italic tracking-tighter leading-none relative z-10 break-all text-left">
-                    ${stats.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </h4>
-                </div>
-
-                <div className="bg-slate-50 rounded-[2.5rem] md:rounded-[4rem] p-8 md:p-12 text-slate-900 border border-slate-100 relative overflow-hidden group hover:shadow-xl transition-all duration-500 text-left">
-                  <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.4em] mb-4 italic leading-none text-left">Volume</p>
-                  <h4 className="text-4xl sm:text-5xl lg:text-6xl font-black italic tracking-tighter leading-none text-left">{stats.totalJobs}</h4>
-                </div>
-
-                <div className="bg-slate-50 rounded-[2.5rem] md:rounded-[4rem] p-8 md:p-12 text-slate-900 border border-slate-100 relative overflow-hidden group hover:shadow-xl transition-all duration-500 md:col-span-2 xl:col-span-1 text-left">
-                  <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.4em] mb-4 italic leading-none text-left">Average</p>
-                  <h4 className="text-4xl sm:text-5xl lg:text-6xl font-black italic tracking-tighter leading-none break-all text-left">
-                    ${stats.avgJobValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                  </h4>
-                </div>
+      {activeTab === 'reports' ? (
+        <div className="space-y-12 animate-in fade-in duration-700">
+          {/* STATS GRID */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-10">
+            <div className="bg-white p-10 rounded-[3rem] border-2 border-slate-50 shadow-xl space-y-6 hover:border-slate-900 transition-all duration-500">
+              <div className="bg-slate-900 text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg">
+                <DollarSign size={28} />
               </div>
-
-              {/* Transactions Table */}
-              <div className="overflow-hidden rounded-[2rem] md:rounded-[3rem] border border-slate-100 shadow-sm text-left">
-                <div className="overflow-x-auto scrollbar-hide text-left">
-                  <table className="w-full text-left border-collapse bg-white min-w-[900px] text-left">
-                    <thead>
-                      <tr className="bg-slate-900 text-white border-b-2 border-slate-800 text-left">
-                        <th className="p-6 md:p-10 text-[9px] font-black uppercase tracking-[0.3em] italic text-left">Settlement</th>
-                        <th className="p-6 md:p-10 text-[9px] font-black uppercase tracking-[0.3em] italic text-left">Profile</th>
-                        <th className="p-6 md:p-10 text-[9px] font-black uppercase tracking-[0.3em] italic text-left">Personnel</th>
-                        <th className="p-6 md:p-10 text-[9px] font-black uppercase tracking-[0.3em] italic text-right text-left">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50 text-left">
-                      {archivedLeads.map((lead) => (
-                        <tr key={lead.id} className="hover:bg-slate-50/50 transition-all duration-300 group text-left">
-                          <td className="p-6 md:p-10 text-left">
-                            <div className="flex flex-col gap-2 text-left">
-                              <span className="text-[10px] font-black text-slate-400 italic text-left">
-                                {lead.completedAt ? new Date(typeof lead.completedAt === 'string' ? lead.completedAt : lead.completedAt.toDate()).toLocaleDateString() : 'ARCHIVED'}
-                              </span>
-                              <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-full w-fit border border-slate-100 text-left">
-                                {getPaymentIcon(lead.paymentMethod)}
-                                <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 text-left">{lead.paymentMethod || 'AUTO'}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-6 md:p-10 text-left">
-                            <p className="font-black text-slate-900 uppercase italic text-xl md:text-2xl tracking-tighter transition-all group-hover:text-blue-600 leading-none mb-2 text-left">
-                              {lead.template?.data?.fullName || `${lead.firstName} ${lead.lastName}`}
-                            </p>
-                            <p className="text-[9px] text-slate-400 font-black tracking-widest flex items-center gap-2 italic uppercase text-left">
-                              <MapPin size={10} className="text-blue-600" /> {lead.address}, {lead.city}
-                            </p>
-                          </td>
-                          <td className="p-6 md:p-10 text-left">
-                            <div className="flex items-center gap-3 text-left">
-                              <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-300 text-left"><UserCheck size={16}/></div>
-                              <p className="text-xs font-black uppercase italic text-slate-900 tracking-wider text-left">
-                                {allEmployees.find(e => e.id === lead.assignedTo)?.name || 'Unassigned'}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="p-6 md:p-10 text-right text-left">
-                            <p className="text-2xl md:text-3xl font-black text-slate-900 italic tracking-tighter leading-none group-hover:text-blue-600 transition-colors text-left">
-                              ${Number(lead.total || lead.finalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </p>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div>
+                <p className="text-5xl font-black text-slate-900 italic tracking-tighter leading-none">${stats.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3 italic">Lifetime Total</p>
               </div>
             </div>
-          ) : (
+
+            <div className="bg-white p-10 rounded-[3.5rem] border-2 border-slate-50 shadow-xl space-y-6 hover:border-blue-600 transition-all duration-500">
+              <div className="bg-blue-600 text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg">
+                <Activity size={28} />
+              </div>
+              <div>
+                <p className="text-5xl font-black text-slate-900 italic tracking-tighter leading-none">{stats.completedJobs}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3 italic">Success Missions</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-10 rounded-[3.5rem] border-2 border-slate-50 shadow-xl space-y-6 hover:border-emerald-500 transition-all duration-500">
+              <div className="bg-emerald-500 text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg">
+                <TrendingUp size={28} />
+              </div>
+              <div>
+                <p className="text-5xl font-black text-slate-900 italic tracking-tighter leading-none">${stats.avgTicket.toFixed(0)}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3 italic">Avg. Mission Val.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 p-10 rounded-[3.5rem] text-white shadow-2xl space-y-6 relative overflow-hidden group">
+              <div className="bg-emerald-500 text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner relative z-10">
+                <Receipt size={28} />
+              </div>
+              <div className="relative z-10">
+                <p className="text-5xl font-black italic tracking-tighter leading-none text-emerald-400 transition-colors group-hover:text-white">${stats.thisMonthRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-3 italic">Monthly Intelligence</p>
+              </div>
+              <div className="absolute -right-8 -bottom-8 w-48 h-48 bg-white/5 rounded-full blur-3xl"></div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-12 animate-in fade-in duration-700">
             <div className="space-y-8 text-left">
               {/* Search and Total */}
               <div className="flex flex-col sm:flex-row items-center gap-6 text-left">
@@ -304,51 +306,122 @@ export default function ReportsPage() {
                   <input 
                     type="text" 
                     placeholder="SEARCH DIRECTORY..." 
-                    className="w-full pl-16 pr-8 py-5 bg-slate-50 rounded-[2rem] font-black text-xs uppercase italic outline-none border-2 border-transparent focus:border-blue-600 transition-all shadow-inner text-left"
+                    className="w-full pl-14 pr-8 py-5 bg-slate-50 rounded-[2rem] font-black text-xs uppercase italic outline-none border-2 border-transparent focus:border-blue-600 transition-all shadow-inner text-left"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
                 <div className="flex flex-col text-left">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1 italic leading-none">Total Clients</p>
+                  <p className="text-slate-400 font-black uppercase text-[8px] tracking-[0.4em] mb-1 italic leading-none">Total Clients</p>
                   <p className="text-2xl font-black text-slate-900 italic tracking-tighter leading-none">{uniqueCustomers.length}</p>
                 </div>
               </div>
 
               {/* Customer Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 text-left">
+              <div className="grid grid-cols-1 gap-6 text-left">
                 {filteredCustomers.map((cust) => {
                   const isExpanded = expandedCustomerId === cust.groupKey;
                   const isRemoving = removingId === cust.groupKey;
                   return (
                     <div 
                       key={cust.groupKey} 
-                      className={`group bg-white rounded-[2.5rem] md:rounded-[3.5rem] border-2 transition-all duration-500 overflow-hidden ${isExpanded ? 'border-blue-600 shadow-2xl scale-[1.01]' : 'border-slate-50 hover:border-slate-200 hover:shadow-xl'}`}
+                      className={`group bg-white rounded-[3rem] border-2 transition-all duration-500 overflow-hidden ${isExpanded ? 'border-blue-600 shadow-2xl scale-[1.01]' : 'border-slate-50 hover:border-slate-200 hover:shadow-xl'}`}
                     >
                       <div 
                         onClick={() => setExpandedCustomerId(isExpanded ? null : cust.groupKey)}
-                        className="p-6 md:p-8 flex items-center justify-between cursor-pointer text-left"
+                        className="p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-10 cursor-pointer text-left"
                       >
-                        <div className="flex items-center gap-6 text-left">
-                          <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${isExpanded ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-300 group-hover:bg-blue-50 group-hover:text-blue-600 shadow-inner'}`}>
-                            <User size={24} />
+                        <div className="flex flex-col md:flex-row items-center gap-8 w-full">
+                          <div className={`h-20 w-20 rounded-[2rem] flex items-center justify-center transition-all ${isExpanded ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-300 group-hover:bg-blue-50 group-hover:text-blue-600 shadow-inner'}`}>
+                            <User size={32} />
                           </div>
-                          <h3 className={`text-xl sm:text-2xl font-black uppercase italic tracking-tighter leading-none transition-colors ${isExpanded ? 'text-blue-600' : 'text-slate-900 group-hover:text-black'}`}>{cust.displayName}</h3>
+                          <div className="flex-1 space-y-4 text-center md:text-left">
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
+                                <h3 className={`text-xl sm:text-2xl font-black uppercase italic tracking-tighter leading-none transition-colors ${isExpanded ? 'text-blue-600' : 'text-slate-900 group-hover:text-black'}`}>{cust.displayName}</h3>
+                                <div className="flex items-center gap-2">
+                                    <span className="flex items-center gap-1 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full text-[8px] font-black uppercase italic tracking-widest border border-emerald-100 shadow-sm">
+                                        <Star size={10} fill="currentColor" /> {cust.referralCount} Referrals
+                                    </span>
+                                    {cust.renewalFrequency && (
+                                        <span className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-[8px] font-black uppercase italic tracking-widest border border-blue-100 flex items-center gap-1 shadow-sm">
+                                            <RefreshCw size={10} /> {cust.renewalFrequency} Month Renewal
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* LINE 1: CONTACT INFO */}
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-8 gap-y-3 text-slate-400">
+                                <div className="flex items-center gap-2">
+                                    <Phone size={14} className="text-blue-600" />
+                                    <p className="text-[10px] font-black text-slate-900 uppercase italic">{cust.phone || 'NO PHONE'}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Mail size={14} className="text-blue-600" />
+                                    <p className="text-[10px] font-black text-slate-900 lowercase italic">{cust.email || 'NO EMAIL'}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <MapPin size={14} className="text-blue-600" />
+                                    <p className="text-[10px] font-black text-slate-900 uppercase italic">
+                                        {cust.address}{cust.city ? `, ${cust.city}` : ''}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* LINE 2: SERVICE SUMMARY */}
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-10 gap-y-3 pt-2 border-t border-slate-50">
+                                <div className="flex items-center gap-3">
+                                    <Clock size={14} className="text-slate-300" />
+                                    <span className="text-[9px] font-black text-slate-300 uppercase italic tracking-widest">Last Service:</span>
+                                    <p className="text-[11px] font-black text-slate-900 uppercase italic tracking-tighter">{formatDate(cust.lastServiceDate)}</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Banknote size={14} className="text-slate-300" />
+                                    <span className="text-[9px] font-black text-slate-300 uppercase italic tracking-widest">Total:</span>
+                                    <p className="text-xl font-black text-blue-600 italic tracking-tighter leading-none">${cust.lifetimeValue.toFixed(2)}</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Activity size={14} className="text-slate-300" />
+                                    <span className="text-[9px] font-black text-slate-300 uppercase italic tracking-widest">Missions:</span>
+                                    <p className="text-[11px] font-black text-slate-900 uppercase italic">{cust.jobCount}</p>
+                                </div>
+                            </div>
+                          </div>
                         </div>
                         <div className={`transition-all duration-500 ${isExpanded ? 'rotate-180 text-blue-600' : 'text-slate-200 group-hover:text-slate-400'}`}>
-                          <ChevronDown size={24} />
+                          <ChevronDown size={40} />
                         </div>
                       </div>
 
                       {isExpanded && (
-                        <div className="px-6 md:px-8 pb-10 space-y-8 animate-in slide-in-from-top-4 duration-500 text-left">
-                          <div className="grid grid-cols-1 gap-4 text-[11px] font-black text-slate-400 uppercase italic tracking-widest text-left">
-                            <span className="flex items-center gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-100 text-left transition-colors"><Phone size={14} className="text-blue-600"/> {cust.phone || 'NO PHONE'}</span>
-                            <span className="flex items-center gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-100 text-left transition-colors"><Mail size={14} className="text-blue-600"/> {cust.email || 'NO EMAIL'}</span>
-                            <span className="flex items-center gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-100 text-left transition-colors"><MapPin size={14} className="text-blue-600"/> {cust.address}, {cust.city}</span>
+                        <div className="px-8 md:p-10 pb-12 space-y-8 animate-in slide-in-from-top-4 duration-500 text-left border-t border-slate-50 pt-10">
+                          {/* Renewal Control Buttons */}
+                          <div className="space-y-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 italic">Subscription Management</p>
+                            <div className="flex flex-wrap gap-3">
+                                <button 
+                                    onClick={() => updateRenewalFrequency(cust, 3)}
+                                    className={`px-8 py-4 rounded-2xl font-black text-[10px] uppercase italic transition-all border-2 ${cust.renewalFrequency === 3 ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-600'}`}
+                                >
+                                    3 Month Renewal (25% Off)
+                                </button>
+                                <button 
+                                    onClick={() => updateRenewalFrequency(cust, 6)}
+                                    className={`px-8 py-4 rounded-2xl font-black text-[10px] uppercase italic transition-all border-2 ${cust.renewalFrequency === 6 ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-600'}`}
+                                >
+                                    6 Month Renewal (20% Off)
+                                </button>
+                                <button 
+                                    onClick={() => updateRenewalFrequency(cust, null)}
+                                    className={`px-8 py-4 rounded-2xl font-black text-[10px] uppercase italic transition-all border-2 ${!cust.renewalFrequency ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400 hover:border-red-500'}`}
+                                >
+                                    None / One-Time
+                                </button>
+                            </div>
                           </div>
+
                           <div className="flex flex-wrap gap-4 pt-6 border-t border-slate-100 text-left">
-                            <button onClick={() => setEditingLead(cust)} className="flex-1 min-w-[140px] py-5 bg-white border-2 border-slate-100 rounded-2xl text-slate-400 font-black uppercase italic text-[10px] tracking-widest hover:border-blue-600 hover:text-blue-600 transition-all leading-none text-left">Edit</button>
+                            <button onClick={() => setEditingLead(cust)} className="flex-1 min-w-[140px] py-5 bg-white border-2 border-slate-100 rounded-2xl text-slate-400 font-black uppercase italic text-[10px] tracking-widest hover:border-blue-600 hover:text-blue-600 transition-all leading-none text-left flex items-center justify-center gap-2">Edit</button>
                             <button onClick={() => navigateToSchedule(cust)} className="flex-1 min-w-[140px] py-5 bg-slate-900 text-white rounded-2xl font-black uppercase italic text-[10px] tracking-widest hover:bg-blue-600 transition-all leading-none text-left flex items-center justify-center gap-2 shadow-xl shadow-slate-200"><Calendar size={14} className="text-blue-400"/> View Job</button>
                             <div className="flex gap-2">
                                 <button 
@@ -375,7 +448,6 @@ export default function ReportsPage() {
                 })}
               </div>
             </div>
-          )}
         </div>
       )}
 

@@ -30,14 +30,14 @@ export default function Hero() {
             Licensed • Bonded • Insured
           </span>
           
-          <h1 className="text-6xl md:text-[5.0rem] font-black leading-[0.85] tracking-tighter mb-10 text-slate-900">
+          <h1 className="text-5xl md:text-7xl lg:text-[5.0rem] font-black leading-[0.85] tracking-tighter mb-10 text-slate-900">
             Modern <br/>
             Window Cleaning <br/>
             <span className="text-slate-400 font-serif italic font-light tracking-tight">for Modern Homes.</span>
           </h1>
           
           <p className="text-2xl md:text-3xl font-serif italic text-slate-400 leading-tight mb-12 max-w-lg">
-            The Clearest Windows in the Tri-Cities, <span className="text-slate-900">Guaranteed.</span>
+            The Clearest Windows in town! <span className="text-slate-900"></span>
           </p>
           
           <div className="flex flex-col sm:flex-row gap-6">

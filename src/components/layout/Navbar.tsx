@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Instagram, Facebook, Lock } from 'lucide-react';
+import { Instagram, Facebook, Lock, Mountain } from 'lucide-react';
 
 interface NavbarProps {
   onOpenModal?: () => void;
@@ -34,7 +34,7 @@ export default function Navbar({ onOpenModal }: NavbarProps) {
       const windowHeight = window.innerHeight;
       const documentHeight = document.documentElement.scrollHeight;
       const scrollTop = window.scrollY;
-      
+
       // If we are within 600px of the bottom, assume footer is visible
       if (scrollTop + windowHeight >= documentHeight - 600) {
         setIsAtBottom(true);
@@ -51,19 +51,27 @@ export default function Navbar({ onOpenModal }: NavbarProps) {
   return (
     <nav className="fixed top-0 w-full z-50 bg-white border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-        
+
         {/* LOGO SECTION - Mirroring the Editorial Style */}
-        <Link 
-          href="/" 
+        <Link
+          href="/"
           onClick={handleLogoClick}
           className="flex items-center gap-4 group cursor-pointer hover:scale-110 transition-all duration-500 origin-left"
         >
-          <div className="flex-shrink-0 w-12 h-12 relative flex items-center justify-center">
-            <img 
-              src="/img/Logo.png" 
-              alt="Clear View LLC" 
-              className="max-w-full max-h-full object-contain group-hover:rotate-3 transition-transform duration-500"
-            />
+          <div className="flex-shrink-0 w-12 h-12 relative flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100 group-hover:bg-black group-hover:border-black transition-all duration-500">
+            {/* Retro 90s Style Geometric Mountains */}
+            <svg 
+              viewBox="0 0 24 24" 
+              className="w-8 h-8 fill-none stroke-slate-900 group-hover:stroke-white transition-colors duration-500" 
+              strokeWidth="1.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              {/* Sharp, minimalist peaks mirroring old Japanese van graphics */}
+              <path d="M3 20L9 6L13 14L17 10L21 20H3Z" />
+              <path d="M9 6L11 10" />
+              <path d="M17 10L15 14" />
+            </svg>
           </div>
           <div className="flex flex-col">
             <h1 className="font-black text-black leading-none tracking-tighter uppercase text-xl">
@@ -71,7 +79,6 @@ export default function Navbar({ onOpenModal }: NavbarProps) {
             </h1>
           </div>
         </Link>
-
         {/* RIGHT SIDE: SOCIALS, PHONE, & CTA */}
         <div className="flex items-center gap-8">
           

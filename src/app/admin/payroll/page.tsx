@@ -436,7 +436,7 @@ export default function UnifiedPayrollStaff() {
       ) : (
         <div className="animate-in fade-in duration-700">
           {activeTab === 'payroll' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-10">
               {payrollData.map((emp) => {
                 const isExpanded = expandedTechId === emp.id;
                 return (
@@ -612,7 +612,7 @@ export default function UnifiedPayrollStaff() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
                 {employees.map((member) => {
                   const isExpanded = expandedStaffId === member.id;
                   const isSelf = currentUser?.email === member.email;

@@ -44,7 +44,9 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
   const totalHoursForAllJobs = useMemo(() => stats.totalMinutes / 60, [stats.totalMinutes]);
   const isSplitMode = formData.mode === 'split';
   const isAllDayBlockMode = formData.mode === 'allDayBlock';
-  const isInteractive = stats.daysRequired > 1;
+  
+  // Logic to determine if we should show interaction hints
+  const isInteractive = stats.daysRequired > 1 || isSplitMode;
 
   const [dayMapping, setDayMapping] = useState<Record<string, number>>({});
 
@@ -62,8 +64,6 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
     setFormData((prev: FormData) => ({
       ...prev,
       mode,
-      // Reset date/time selections when mode changes, unless it's explicitly set by force-mode logic.
-      // This prevents issues where previously selected dates/times might conflict with new mode rules.
       selectedDate: null,
       endDate: null,
       timeSlot: null,
@@ -74,7 +74,7 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
       day2SelectedSlotStartTimeMinutes: null,
       day2SelectedJobEndTimeMinutes: null,
     }));
-    setSplitStep(1); // Always reset to day 1 when mode changes
+    setSplitStep(1);
   }, [setFormData]);
 
   // Effect to automatically set mode based on job duration
@@ -85,6 +85,11 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
     } else if (totalHoursForAllJobs > 9) {
       newMode = 'split';
     } else {
+      // Don't auto-downgrade from 'split' if the user manually selected it
+      // unless the duration is clearly compatible only with 'single'
+      if (formData.mode === 'split' && stats.serviceJobs.length >= 2) {
+        return; 
+      }
       newMode = 'single';
     }
 
@@ -94,26 +99,33 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
         mode: newMode,
       }));
     }
-  }, [totalHoursForAllJobs, setFormData, formData.mode]);
+  }, [totalHoursForAllJobs, setFormData, formData.mode, stats.serviceJobs.length]);
 
   useEffect(() => {
     const initialMap: Record<string, number> = {};
     const SERVICE_PRIORITY: Record<string, number> = { 'Roof Cleaning': 1, 'Gutter Cleaning': 2, 'Pressure Washing': 3, 'Solar Panel Cleaning': 4, 'Window Cleaning': 5, 'Skylights': 6 };
     const sortedRawJobs = [...stats.serviceJobs].sort((a, b) => (SERVICE_PRIORITY[a.name] || 99) - (SERVICE_PRIORITY[b.name] || 99));
     const dMins = [0, 0, 0, 0, 0, 0, 0, 0];
+    
+    // Determine target days count
+    const targetDays = Math.max(stats.daysRequired, formData.mode === 'split' ? 2 : 1);
+
     sortedRawJobs.forEach((job) => {
       let assignedDay = 1;
       let found = false;
-      for (let i = 1; i <= stats.daysRequired; i++) {
+      for (let i = 1; i <= targetDays; i++) {
         if (dMins[i] + job.time <= 540) { assignedDay = i; found = true; break; }
       }
       if (!found) {
         let minDay = 1; let minVal = dMins[1];
-        for (let i = 1; i <= stats.daysRequired; i++) { if (dMins[i] < minVal) { minVal = dMins[i]; minDay = i; } }
+        for (let i = 1; i <= targetDays; i++) { if (dMins[i] < minVal) { minVal = dMins[i]; minDay = i; } }
         assignedDay = minDay;
       }
+      
+      // If split mode is active, try to move window cleaning to day 2 if there are other jobs on day 1
       const shouldForceSplitMove = formData.mode === 'split' && job.name.includes('Window Cleaning') && sortedRawJobs.length > 1;
       if (shouldForceSplitMove && assignedDay === 1) assignedDay = 2;
+      
       initialMap[job.name] = assignedDay;
       dMins[assignedDay] += job.time;
     });
@@ -236,9 +248,7 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
 
   const disabledDays = useMemo(() => {
     const today = new Date();
-    const may1st = new Date(today.getFullYear(), 4, 1); // May 1st of current year
-
-    // The earliest selectable date is May 1st.
+    const may1st = new Date(today.getFullYear(), 4, 1); 
     const minSelectableDate = may1st > today ? may1st : today;
 
     const commonDisabled = Object.keys(dayTotalMins).filter((tsStr) => {
@@ -300,8 +310,9 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
         </div>
       </div>
 
-      <div className={`grid gap-6 max-w-4xl mx-auto ${stats.daysRequired > 1 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-        {Array.from({ length: Math.max(1, stats.daysRequired) }).map((_, idx) => {
+      {/* Render Day Cards based on required days or split mode */}
+      <div className={`grid gap-6 max-w-4xl mx-auto ${Math.max(stats.daysRequired, isSplitMode ? 2 : 1) > 1 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+        {Array.from({ length: Math.max(1, stats.daysRequired, isSplitMode ? 2 : 1) }).map((_, idx) => {
           const dNum = idx + 1;
           const dayJobs = stats.serviceJobs.filter(j => dayMapping[j.name] === dNum || (!dayMapping[j.name] && dNum === 1));
           const dayHours = dayJobs.reduce((acc, j) => acc + j.time, 0) / 60;
@@ -323,7 +334,7 @@ export default function CalendarStep({ formData, setFormData, stats, onNext, onB
                   {currentSlot && <p className="text-[9px] font-black text-blue-500 uppercase mt-1 tracking-widest">{ARRIVAL_SLOTS.find(s => s.id === currentSlot)?.label}</p>}
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Work</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">est time</p>
                   <p className={`text-lg font-black italic ${dayHours > 9 ? 'text-red-500' : 'text-slate-900'}`}>{formatHoursToHm(dayHours)}</p>
                 </div>
               </div>

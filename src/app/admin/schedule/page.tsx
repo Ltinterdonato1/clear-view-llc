@@ -289,6 +289,20 @@ export default function AdminSchedule() {
     return branchFilteredJobs.filter(j => !j.assignedTo && j.status !== 'Archived' && j.status !== 'Completed' && !j.isNotification);
   }, [branchFilteredJobs]);
 
+  const unassignedByBranch = useMemo(() => {
+    const counts: Record<string, number> = {};
+    BRANCHES.forEach(b => {
+      counts[b] = jobs.filter(j => 
+        j.branch === b && 
+        !j.assignedTo && 
+        j.status !== 'Archived' && 
+        j.status !== 'Completed' && 
+        !j.isNotification
+      ).length;
+    });
+    return counts;
+  }, [jobs]);
+
   const scheduleConflicts = useMemo(() => {
     if (jobs.length === 0 || allAttendance.length === 0) return [];
     
@@ -389,10 +403,13 @@ export default function AdminSchedule() {
             {BRANCHES.map(b => (
               <button 
                 key={b} onClick={() => setSelectedBranch(b)}
-                className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border-2
+                className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-2
                   ${selectedBranch === b ? 'bg-slate-900 border-slate-900 text-white shadow-xl scale-105' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-900 hover:text-slate-900'}`}
               >
                 {b}
+                {unassignedByBranch[b] > 0 && (
+                  <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]"></span>
+                )}
               </button>
             ))}
           </div>
