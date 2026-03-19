@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 // Array of work truck images
 const workTruckImages = [
-  '/img/worktruck1.png',
+  '/img/worktruck1.jpg',
   '/img/worktruck2.jpg',
   '/img/worktruck4.jpg',
   '/img/worktruckcityrain.jpg',

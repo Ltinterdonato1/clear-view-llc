@@ -3,11 +3,10 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 
 const heroImages = [
-  "/img/worktruck1.png",
+  "/img/worktruck1.jpg",
   "/img/worktruck2.jpg",
+  "/img/worktruck3.jpg",
   "/img/worktruck4.jpg",
-  "/img/worktruckcityrain.jpg",
-  "/img/worktruckfall.jpg",
 ];
 
 export default function Hero() {
@@ -53,13 +52,13 @@ export default function Hero() {
 
         {/* Right Side: High-End Framed Visual */}
         <div className="relative">
-          <div className="relative w-full aspect-[4/5] rounded-[4rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] bg-slate-50 border border-slate-100">
+          <div className="relative w-full aspect-[4/5] rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] bg-slate-50">
             <Image 
               src={currentHeroImage} 
               alt="Clear View LLC Professional Service" 
               fill 
               priority
-              className="object-cover transition-transform duration-[2000ms] hover:scale-110"
+              className="object-contain transition-transform duration-[2000ms] hover:scale-110 border-8 border-white rounded-[4rem]"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
           </div>
