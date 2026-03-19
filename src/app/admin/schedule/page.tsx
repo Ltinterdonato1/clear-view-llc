@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { db } from '../../../lib/firebase';
 import { collection, query, onSnapshot, orderBy, doc, updateDoc, addDoc, where, getDocs, limit, deleteDoc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore'; 
 import { 
@@ -12,7 +12,7 @@ import { useSearchParams } from 'next/navigation';
 
 const BRANCHES = ['Tri-Cities', 'Walla Walla', 'Tacoma', 'Puyallup'];
 
-export default function AdminSchedule() {
+function ScheduleContent() {
   const searchParams = useSearchParams();
   const [jobs, setJobs] = useState<any[]>([]);
   const [activeCrew, setActiveCrew] = useState<any[]>([]);
@@ -560,5 +560,18 @@ export default function AdminSchedule() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminSchedule() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex flex-col items-center justify-center bg-white space-y-6">
+        <Loader2 className="animate-spin text-slate-200" size={64} />
+        <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-300 italic">Syncing Calendar...</p>
+      </div>
+    }>
+      <ScheduleContent />
+    </Suspense>
   );
 }
