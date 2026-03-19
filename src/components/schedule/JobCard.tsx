@@ -292,7 +292,13 @@ const JobCard: React.FC<JobCardProps> = ({
                             key={emp.id}
                             onClick={() => {
                               if (!emp.isOffDuty) {
-                                updateJob?.(job.id, job, { assignedTo: emp.id }, true);
+                                // Logic: If we are assigning a tech who previously declined,
+                                // we clear them from the declinedBy list so it's a fresh assignment.
+                                const nextDeclined = (job.declinedBy || []).filter((id: string) => id !== emp.id && id !== emp.email);
+                                updateJob?.(job.id, job, { 
+                                  assignedTo: emp.id,
+                                  declinedBy: nextDeclined 
+                                }, true);
                                 setIsAssignOpen(false);
                               }
                             }}
