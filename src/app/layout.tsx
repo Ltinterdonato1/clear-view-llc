@@ -31,10 +31,10 @@ const selectedImage = workTruckImages[currentMonth % workTruckImages.length];
 
 export const metadata: Metadata = {
   title: "Clear View LLC",
-  description: "Professional window and gutter cleaning services in the Tri-Cities, WA area. Advanced pure-water technology for a crystal clear view.",
+  description: "Professional window and gutter cleaning services. Advanced pure-water technology for a crystal clear view.",
   openGraph: {
     title: "Clear View LLC",
-    description: "Professional window and gutter cleaning services in the Tri-Cities, WA area.",
+    description: "Professional window and gutter cleaning services.",
     images: [
       {
         url: selectedImage,
