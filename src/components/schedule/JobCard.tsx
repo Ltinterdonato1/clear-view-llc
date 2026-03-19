@@ -285,32 +285,40 @@ const JobCard: React.FC<JobCardProps> = ({
                   <button onClick={() => setIsAssignOpen(!isAssignOpen)} className="w-full px-10 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase italic text-[10px] tracking-[0.2em] shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-3"><UserPlus size={16} /> Assign Tech</button>
                   {isAssignOpen && (
                     <div className="absolute right-0 top-full mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 p-3 z-50 animate-in slide-in-from-top-2 text-left">
-                      {allTechs.map(emp => (
-                        <button
-                          key={emp.id}
-                          onClick={() => {
-                            if (!emp.isOffDuty) {
-                              updateJob?.(job.id, job, { assignedTo: emp.id }, true);
-                              setIsAssignOpen(false);
-                            }
-                          }}
-                          disabled={emp.isOffDuty}
-                          className={`w-full text-left px-6 py-4 rounded-xl font-black uppercase italic text-[10px] tracking-widest transition-all flex items-center justify-between group ${emp.isOffDuty
-                              ? 'bg-slate-50 text-slate-300 cursor-not-allowed opacity-50'
-                              : 'hover:bg-emerald-50 text-slate-900 cursor-pointer'
-                            }`}
-                        >
-                          <div className="flex flex-col gap-0.5">
-                            <span>{emp.name}</span>
-                            {emp.isOffDuty && (
-                              <span className="text-[7px] text-red-400 normal-case font-bold tracking-normal italic">
-                                Off-Duty ({emp.offDutyType === 'vacation' ? 'Vacation' : emp.offDutyType === 'sick' ? 'Sick' : 'Vacation/Sick'})
-                              </span>
-                            )}
-                          </div>
-                          {!emp.isOffDuty && <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-emerald-600" />}
-                        </button>
-                      ))}
+                      {allTechs.map(emp => {
+                        const hasDeclined = job.declinedBy?.includes(emp.id) || job.declinedBy?.includes(emp.email);
+                        return (
+                          <button
+                            key={emp.id}
+                            onClick={() => {
+                              if (!emp.isOffDuty) {
+                                updateJob?.(job.id, job, { assignedTo: emp.id }, true);
+                                setIsAssignOpen(false);
+                              }
+                            }}
+                            disabled={emp.isOffDuty}
+                            className={`w-full text-left px-6 py-4 rounded-xl font-black uppercase italic text-[10px] tracking-widest transition-all flex items-center justify-between group ${emp.isOffDuty
+                                ? 'bg-slate-50 text-slate-300 cursor-not-allowed opacity-50'
+                                : 'hover:bg-emerald-50 text-slate-900 cursor-pointer'
+                              }`}
+                          >
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2">
+                                <span>{emp.name}</span>
+                                {hasDeclined && (
+                                  <span className="bg-orange-500 text-white px-2 py-0.5 rounded-full text-[6px] font-black tracking-widest animate-pulse">DECLINED</span>
+                                )}
+                              </div>
+                              {emp.isOffDuty && (
+                                <span className="text-[7px] text-red-400 normal-case font-bold tracking-normal italic">
+                                  Off-Duty ({emp.offDutyType === 'vacation' ? 'Vacation' : emp.offDutyType === 'sick' ? 'Sick' : 'Vacation/Sick'})
+                                </span>
+                              )}
+                            </div>
+                            {!emp.isOffDuty && <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-emerald-600" />}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
