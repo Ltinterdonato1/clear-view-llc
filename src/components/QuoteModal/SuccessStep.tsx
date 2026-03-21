@@ -32,8 +32,7 @@ export default function SuccessStep({ onClose }: any) {
           Booking Confirmed
         </p>
         <p className="text-slate-500 font-medium leading-relaxed">
-          We've sent a detailed confirmation to your email. <br />
-          We will see you at your scheduled time!
+         
         </p>
       </div>
 

@@ -98,46 +98,106 @@ const JobCard: React.FC<JobCardProps> = ({
     } catch (err) { console.error("Error updating email:", err); }
   };
 
-  const sendInvoiceEmail = async () => {
-    const finalEmail = recipientEmail.trim().toLowerCase();
-    if (!finalEmail) { alert("Please provide a valid email address."); return; }
-    setIsSendingInvoice(true);
-    try {
-      const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
-      const result = await createStripeCheckout({
-        amount: parseFloat(mStats.total),
-        leadId: job.id,
-        customerEmail: finalEmail,
-        customerName: `${job.firstName} ${job.lastName}`
-      });
-      const data = result.data as { url: string };
-      
-      const subject = encodeURIComponent("Service Invoice - Clear View LLC");
-      const body = encodeURIComponent(`Hi ${job.firstName},\n\nHere is your invoice for your service at ${fullAddress}.\n\nYou can pay securely here:\n${data.url}\n\nThank you for choosing Clear View LLC!`);
-      
-      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${finalEmail}&su=${subject}&body=${body}`, '_blank');
-      
-      setInvoiceSent(true); 
-      setTimeout(() => setInvoiceSent(false), 3000);
-      setIsSendingInvoice(false);
-    } catch (err: any) { console.error(err); alert("Failed: " + err.message); setIsSendingInvoice(false); }
-  };
+  
 
-  const resendConfirmation = async () => {
-    const finalEmail = recipientEmail.trim().toLowerCase();
-    if (!finalEmail) { alert("Please provide a valid email address."); return; }
-    setIsSendingConf(true);
+// Invoice Email Function
+const sendInvoiceEmail = async () => {
+  const finalEmail = recipientEmail.trim().toLowerCase();
+  if (!finalEmail) { alert("Please provide a valid email address."); return; }
+  setIsSendingInvoice(true);
+  try {
+    const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
+    const result = await createStripeCheckout({
+      amount: parseFloat(mStats.total),
+      leadId: job.id,
+      customerEmail: finalEmail,
+      customerName: `${job.firstName} ${job.lastName}`
+    });
+    const data = result.data as { url: string };
     
-    const dateStr = format(getSafeDate(job.selectedDate) || new Date(), 'EEEE, MMMM do');
-    const subject = encodeURIComponent("Reservation Confirmed - Clear View LLC");
-    const body = encodeURIComponent(`Hi ${job.firstName},\n\nYour reservation for ${dateStr} at ${fullAddress} is confirmed! We look forward to seeing you.\n\nBest,\nClear View LLC`);
+    const subject = encodeURIComponent(`Invoice from Clear View LLC - ${job.firstName} ${job.lastName}`);
+    
+    // Professional Invoice Layout
+    const body = encodeURIComponent(
+      `SERVICE INVOICE\n` +
+      `------------------------------------------\n\n` +
+      `Hi ${job.firstName},\n\n` +
+      `Thank you for choosing Clear View LLC! Your service at ${displayCity} is complete. Please find your invoice details below:\n\n` +
+      `BILLING SUMMARY:\n` +
+      `• Service Address: ${fullAddress}\n` +
+      `• Total Amount: $${mStats.total}\n\n` +
+      `PAYMENT LINK:\n` +
+      `You can pay securely online via Stripe here:\n` +
+      `${data.url}\n\n` +
+      `------------------------------------------\n` +
+      `If you have any questions regarding this invoice, please reach out to us at (206) 848-9325.\n\n` +
+      `We appreciate your business!\n\n` +
+      `Best,\n` +
+      `Clear View LLC`
+    );
     
     window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${finalEmail}&su=${subject}&body=${body}`, '_blank');
     
-    setConfSent(true); 
-    setTimeout(() => setConfSent(false), 3000);
-    setIsSendingConf(false);
-  };
+    setInvoiceSent(true); 
+    setTimeout(() => setInvoiceSent(false), 3000);
+    setIsSendingInvoice(false);
+  } catch (err: any) { 
+    console.error(err); 
+    alert("Failed: " + err.message); 
+    setIsSendingInvoice(false); 
+  }
+};
+
+  
+
+// Confirmation Email Function
+const resendConfirmation = async () => {
+  const finalEmail = recipientEmail.trim().toLowerCase();
+  if (!finalEmail) { alert("Please provide a valid email address."); return; }
+  setIsSendingConf(true);
+  
+  const dateStr = format(getSafeDate(job.selectedDate) || new Date(), 'MMMM d, yyyy');
+  
+  // 1. IMPROVED SERVICES LIST: Checks for Window & Roof types
+  const servicesList = (job.selectedServices || []).map(s => {
+    if (s === 'Window Cleaning' && job.windowType) {
+      const typeMap: { [key: string]: string } = { 'int_ext': 'Int/Ext', 'ext': 'Exterior Only', 'int': 'Interior Only' };
+      return `${s} (${typeMap[job.windowType] || job.windowType})`;
+    }
+    if (s === 'Roof Cleaning' && job.roofType) {
+      return `${s} (${job.roofType})`;
+    }
+    return s;
+  }).join(', ');
+
+  // 2. UPDATED SUBJECT: Leads with the Scheduled Date
+  const subject = encodeURIComponent(`Scheduled Date: ${dateStr}` );
+  
+  const body = encodeURIComponent(
+    `Hi ${job.firstName},\n\n` +
+    `Your service with Clear View LLC is officially on the schedule! We look forward to seeing you soon.\n\n` +
+    `SERVICE DETAILS:\n` +
+    `• Services: ${servicesList}\n` +
+    `• Arrival Window: ${arrivalTime}\n` +
+    `• Service Address: ${fullAddress}\n\n` +
+    
+    `Best regards,\n` +
+    `Clear View LLC\n` +
+    `clearview3cleaners@gmail.com\n` +
+    `206-848-9325`
+  );
+  
+  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${finalEmail}&su=${subject}&body=${body}`, '_blank');
+  
+  setConfSent(true); 
+  setTimeout(() => setConfSent(false), 3000);
+  setIsSendingConf(false);
+};
+
+
+
+
+
 
   const handleRescheduleDate = (date: Date | undefined) => {
     if (!date || !isUnlocked) return;

@@ -3,7 +3,9 @@ import React, { useState } from 'react';
 import { db } from '../../../lib/firebase';
 import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Clock, Calendar, DollarSign, Home, User, MapPin, Sparkles, Waves, Droplets, Wind, Plus, Minus, Building2, Sun, Loader2, CheckSquare } from 'lucide-react';
-import { startOfDay, addDays } from 'date-fns';
+import { startOfDay, addDays, eachDayOfInterval, format } from 'date-fns';
+import { DayPicker, DateRange } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
 
 const BRANCHES = ['Tri-Cities', 'Walla Walla', 'Tacoma', 'Puyallup'];
 const CITIES = [
@@ -24,7 +26,7 @@ export default function ManualBooking() {
     city: 'Kennewick',
     branch: 'Tri-Cities' as any,
     totalAmount: '',
-    appointmentDate: '',
+    appointmentDateRange: { from: undefined, to: undefined } as DateRange,
     timeSlot: 'morning',
     notes: '',
     selectedServices: [] as string[],
@@ -69,26 +71,20 @@ export default function ManualBooking() {
 
   const getMinBookingDate = () => {
     const today = new Date();
-    const april1st = new Date(today.getFullYear(), 3, 1); // April 1st of current year (month is 0-indexed)
+    const april1st = new Date(today.getFullYear(), 3, 1);
     const twoWeeksFromNow = addDays(today, 14);
-
-    // The earliest selectable date is either April 1st OR two weeks from now, whichever is LATER.
-    const minDate = today < april1st ? april1st : twoWeeksFromNow;
-
-    return minDate.toISOString().split('T')[0];
+    return today < april1st ? april1st : twoWeeksFromNow;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.firstName || !formData.appointmentDate || !formData.totalAmount) {
+    if (!formData.firstName || !formData.appointmentDateRange.from || !formData.totalAmount) {
       alert("Please fill in the required fields (Name, Date, Amount)");
       return;
     }
 
-    const selectedBookingDate = new Date(formData.appointmentDate + 'T00:00:00');
-    const minDate = new Date(getMinBookingDate() + 'T00:00:00');
-
-    if (selectedBookingDate < minDate) {
+    const minDate = getMinBookingDate();
+    if (startOfDay(formData.appointmentDateRange.from) < startOfDay(minDate)) {
       alert(`Bookings are not available until ${format(minDate, 'MMMM do, yyyy')}.`);
       return;
     }
@@ -96,19 +92,24 @@ export default function ManualBooking() {
     setLoading(true);
 
     try {
-      const startDate = startOfDay(new Date(formData.appointmentDate + 'T00:00:00'));
+      const { from, to } = formData.appointmentDateRange;
+      const startDate = startOfDay(from!);
+      const endDate = to ? startOfDay(to) : startDate;
+
+      const bookedDays = eachDayOfInterval({ start: startDate, end: endDate }).map(date => Timestamp.fromDate(date));
+
       const fullName = `${formData.firstName} ${formData.lastName}`.trim();
       const city = formData.city;
       const fullAddress = `${formData.address}, ${city}`;
       
       const leadPayload = {
         ...formData,
-        branch: formData.branch || 'Tri-Cities', // Ensure branch is explicitly set
+        branch: formData.branch || 'Tri-Cities',
         status: 'Confirmed',
         createdAt: serverTimestamp(),
         total: formData.totalAmount,
         selectedDate: Timestamp.fromDate(startDate),
-        actualBookedDays: [Timestamp.fromDate(startDate)],
+        actualBookedDays: bookedDays,
         arrivalWindow: formData.timeSlot === 'morning' ? '8:00 AM' : formData.timeSlot === 'midday' ? '11:30 AM' : '3:00 PM',
         totalMinutes: 120,
         to: [formData.email],
@@ -118,7 +119,7 @@ export default function ManualBooking() {
             firstName: formData.firstName,
             fullName: fullName,
             fullAddress: fullAddress,
-            date: formData.appointmentDate,
+            date: format(startDate, 'MMMM do, yyyy'),
             time: formData.timeSlot === 'morning' ? '8:00 AM' : formData.timeSlot === 'midday' ? '11:30 AM' : '3:00 PM',
             services: formData.selectedServices.join(', '),
             total: formData.totalAmount
@@ -130,7 +131,8 @@ export default function ManualBooking() {
       alert("Job booked successfully!");
       setFormData({
         firstName: '', lastName: '', email: '', phone: '', address: '',
-        city: 'Kennewick', branch: 'Tri-Cities', totalAmount: '', appointmentDate: '',
+        city: 'Kennewick', branch: 'Tri-Cities', totalAmount: '', 
+        appointmentDateRange: { from: undefined, to: undefined },
         timeSlot: 'morning', notes: '', selectedServices: [],
         windowCount: 0, windowType: 'none', homeSize: '1-2', stories: 1,
         solarPanelCount: 0, gutterFlush: false, deluxeGutter: false, roofBlowOff: false,
@@ -210,7 +212,20 @@ export default function ManualBooking() {
           <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 space-y-6">
             <div className="flex items-center gap-3 text-slate-400 mb-2"><Calendar size={18} /><h3 className="text-[10px] font-black uppercase tracking-widest italic">Schedule & Pricing</h3></div>
             <div className="space-y-4">
-              <div className="space-y-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Appointment Date</label><input type="date" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold outline-none" value={formData.appointmentDate} onChange={e => setFormData({...formData, appointmentDate: e.target.value})} min={getMinBookingDate()} required /></div>
+                <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Appointment Date(s)</label>
+                    <DayPicker
+                        mode="range"
+                        selected={formData.appointmentDateRange}
+                        onSelect={(range) => setFormData({ ...formData, appointmentDateRange: range || { from: undefined, to: undefined } })}
+                        disabled={{ before: getMinBookingDate() }}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 font-bold"
+                        styles={{
+                            caption: { color: '#334155', fontWeight: '900', textTransform: 'uppercase', fontSize: '12px' },
+                            head: { color: '#94a3b8' },
+                        }}
+                    />
+                </div>
               <div className="grid grid-cols-3 gap-2">
                 {['morning', 'midday', 'afternoon'].map(s => (
                   <button key={s} type="button" onClick={() => setFormData({...formData, timeSlot: s})} className={`py-3 rounded-xl text-[8px] font-black uppercase border-2 transition-all ${formData.timeSlot === s ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-slate-50 border-slate-50 text-slate-400'}`}>{s === 'morning' ? '8:00 AM' : s === 'midday' ? '11:30 AM' : '3:00 PM'}</button>
