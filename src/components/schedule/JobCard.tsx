@@ -39,20 +39,24 @@ const JobCard: React.FC<JobCardProps> = ({
   deleteJob,
   setCompletingJob,
   initialExpanded = false,
+  userEmail
 }) => {
   const mStats = calculateJobStats(job);
   const isUnlocked = unlockedJobs.has(job.id);
-  const lauren = { id: 'Lauren_Interdonato', name: 'Lauren Interdonato', status: 'clocked_in', isOffDuty: false };
+  const lauren = { id: 'Lauren_Interdonato', name: 'Lauren Interdonato', email: 'clearview3cleaners@gmail.com', status: 'clocked_in', isOffDuty: false };
   
   const allTechs = useMemo(() => {
     const list = [...allEmployees];
-    if (!list.some(e => e.id === lauren.id || e.name === lauren.name)) {
+    if (!list.some(e => e.id === lauren.id || e.email?.toLowerCase() === lauren.email.toLowerCase())) {
       list.unshift(lauren);
     }
     return list;
   }, [allEmployees]);
 
-  const assignedMember = allTechs.find(e => e.id === job.assignedTo);
+  const assignedMember = allTechs.find(e => 
+    (job.assignedTo && e.id === job.assignedTo) || 
+    (job.assignedTo && e.email?.toLowerCase() === job.assignedTo.toLowerCase())
+  );
   
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const assignRef = useRef<HTMLDivElement>(null);
@@ -94,20 +98,6 @@ const JobCard: React.FC<JobCardProps> = ({
     } catch (err) { console.error("Error updating email:", err); }
   };
 
-  const getEmailHtml = (type: 'confirmation' | 'invoice', data: any) => {
-    const title = type === 'invoice' ? 'Service Invoice' : 'Reservation Confirmed';
-    const intro = type === 'invoice' 
-      ? `Hi <strong style="font-weight: 800; color: #0f172a;">${data.firstName}</strong>, here is your service invoice for <span style="color: #0284c7; font-weight: 600;">${data.fullAddress}</span>.`
-      : `Hi <strong style="font-weight: 800; color: #0f172a;">${data.firstName}</strong>, your reservation is confirmed! Our Team will be at <span style="color: #0284c7; font-weight: 600;">${data.fullAddress}</span>. We will see you soon.`;
-    
-    const paymentButton = (type === 'invoice' && data.url) ? `
-      <div style="margin-top: 30px; text-align: center;">
-        <a href="${data.url}" style="background-color: #0284c7; color: white; padding: 18px 40px; text-decoration: none; border-radius: 12px; font-weight: 800; text-transform: uppercase; font-size: 14px; display: inline-block;">Pay Invoice Securely</a>
-      </div>` : '';
-
-    return `<!DOCTYPE html><html><body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; background-color: #f1f5f9; margin: 0; padding: 40px 20px;"><div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 32px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);"><div style="background: #0f172a; padding: 60px 40px; text-align: center;"><div style="display: inline-block; padding: 12px 24px; border: 1px solid #334155; border-radius: 100px; margin-bottom: 24px;"><span style="color: #38bdf8; font-size: 10px; font-weight: 900; letter-spacing: 4px; text-transform: uppercase;">${title}</span></div><h1 style="color: #ffffff; margin: 0; font-size: 42px; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; font-style: italic;">Clear View LLC</h1></div><div style="padding: 50px 40px;"><p style="font-size: 20px; line-height: 1.5; margin-bottom: 40px; color: #334155; font-weight: 300;">${intro}</p><table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 40px; border-collapse: separate; border-spacing: 0 10px;"><tr><td style="background: #f8fafc; padding: 20px; border-radius: 16px 0 0 16px; border: 1px solid #e2e8f0; border-right: none;"><span style="display: block; color: #94a3b8; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 2px; margin-bottom: 8px;">Scheduled Date(s)</span><strong style="color: #0f172a; font-size: 16px;">${data.date}</strong></td><td style="background: #f8fafc; padding: 20px; border-radius: 0 16px 16px 0; border: 1px solid #e2e8f0; border-left: none;"><span style="display: block; color: #94a3b8; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: 2px; margin-bottom: 8px;">Arrival Window</span><strong style="color: #0284c7; font-size: 16px;">${data.time}</strong></td></tr></table><div style=\"margin-bottom: 40px;\"><h3 style=\"font-size: 11px; text-transform: uppercase; letter-spacing: 3px; color: #94a3b8; margin-bottom: 20px; font-weight: 800; text-align: center;\">Service Summary</h3><div style=\"background: #ffffff; border: 1px solid #f1f5f9; border-radius: 20px; padding: 25px; font-size: 14px; font-weight: 500; color: #1e293b; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); white-space: pre-line; line-height: 1.8;\">${data.serviceBreakdown}</div></div>${paymentButton}<div style=\"background: #0f172a; border-radius: 24px; padding: 35px; color: #ffffff; text-align: center;\"><p style=\"color: #94a3b8; font-size: 13px; margin-bottom: 10px;\">Balance Due</p><h2 style=\"font-size: 48px; font-weight: 900; color: #38bdf8; margin: 0;\">$${data.balanceDue}</h2></div><p style=\"margin-top: 40px; text-align: center; color: #64748b; font-size: 14px; font-style: italic;\">\"Professional service, every time.\"</p></div><div style=\"background: #f8fafc; padding: 40px; border-top: 1px solid #f1f5f9;\"><div style=\"border-top: 1px solid #e2e8f0; text-align: center; padding-top: 30px;\"><p style=\"text-transform: uppercase; font-size: 10px; letter-spacing: 2px; color: #94a3b8; font-weight: 800; margin-bottom: 15px;\">Clear View LLC</p><p style=\"font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 5px;\">📞 (206) 848-9325</p><p style=\"font-size: 12px; font-weight: 700; color: #0f172a;\">📧 clearview3cleaners@gmail.com</p></div></div></div></body></html>`;
-  };
-
   const sendInvoiceEmail = async () => {
     const finalEmail = recipientEmail.trim().toLowerCase();
     if (!finalEmail) { alert("Please provide a valid email address."); return; }
@@ -121,59 +111,32 @@ const JobCard: React.FC<JobCardProps> = ({
         customerName: `${job.firstName} ${job.lastName}`
       });
       const data = result.data as { url: string };
-      if (data.url) {
-        const subtotal = mStats.lineItems.filter((item: any) => !item.name.toLowerCase().includes('tax')).reduce((acc: number, item: any) => acc + (Number(item.price) || 0), 0);
-        const discount = mStats.discounts.reduce((acc: any, d: any) => acc + d.amount, 0);
-        const templateData = {
-          firstName: job.firstName,
-          fullAddress: fullAddress,
-          date: format(getSafeDate(job.selectedDate) || new Date(), 'EEEE, MMMM do'),
-          time: arrivalTime,
-          serviceBreakdown: job.selectedServices?.join('\n') || 'Cleaning Services',
-          subtotal: subtotal.toFixed(2),
-          discountAmount: discount.toFixed(2),
-          balanceDue: mStats.total,
-          url: data.url
-        };
-        const html = getEmailHtml('invoice', templateData);
-        // DOUBLE WRITE (Proven Success Path)
-        await addDoc(collection(db, "mail"), { to: [finalEmail], message: { subject: `Service Invoice - Clear View LLC`, html: html } });
-        await addDoc(collection(db, "leads"), { ...job, id: job.id + '_inv_' + Date.now(), status: 'Notification', isNotification: true, createdAt: serverTimestamp(), template: { name: 'invoice', data: templateData } });
-        setInvoiceSent(true); 
-        setTimeout(() => setInvoiceSent(false), 3000);
-        setIsSendingInvoice(false);
-        alert(`Invoice sent successfully to ${finalEmail}`);
-      }
-    } catch (err: any) { console.error(err); alert("Failed to send invoice: " + err.message); setIsSendingInvoice(false); }
+      
+      const subject = encodeURIComponent("Service Invoice - Clear View LLC");
+      const body = encodeURIComponent(`Hi ${job.firstName},\n\nHere is your invoice for your service at ${fullAddress}.\n\nYou can pay securely here:\n${data.url}\n\nThank you for choosing Clear View LLC!`);
+      
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${finalEmail}&su=${subject}&body=${body}`, '_blank');
+      
+      setInvoiceSent(true); 
+      setTimeout(() => setInvoiceSent(false), 3000);
+      setIsSendingInvoice(false);
+    } catch (err: any) { console.error(err); alert("Failed: " + err.message); setIsSendingInvoice(false); }
   };
 
   const resendConfirmation = async () => {
     const finalEmail = recipientEmail.trim().toLowerCase();
     if (!finalEmail) { alert("Please provide a valid email address."); return; }
     setIsSendingConf(true);
-    try {
-      const subtotal = mStats.lineItems.filter((item: any) => !item.name.toLowerCase().includes('tax')).reduce((acc: number, item: any) => acc + (Number(item.price) || 0), 0);
-      const discount = mStats.discounts.reduce((acc: any, d: any) => acc + d.amount, 0);
-      const dateStr = format(getSafeDate(job.selectedDate) || new Date(), 'EEEE, MMMM do');
-      const templateData = {
-        firstName: job.firstName,
-        fullAddress: fullAddress,
-        date: dateStr,
-        time: arrivalTime,
-        serviceBreakdown: job.selectedServices?.join('\n') || 'Services',
-        subtotal: subtotal.toFixed(2),
-        discountAmount: discount.toFixed(2),
-        balanceDue: mStats.total
-      };
-      const html = getEmailHtml('confirmation', templateData);
-      // DOUBLE WRITE (Proven Success Path)
-      await addDoc(collection(db, "mail"), { to: [finalEmail], message: { subject: `Reservation Confirmed - Clear View LLC`, html: html } });
-      await addDoc(collection(db, "leads"), { ...job, id: job.id + '_conf_' + Date.now(), status: 'Notification', isNotification: true, createdAt: serverTimestamp(), template: { name: 'confirmation', data: templateData } });
-      setConfSent(true); 
-      setTimeout(() => setConfSent(false), 3000);
-      setIsSendingConf(false);
-      alert(`Confirmation resent successfully to ${finalEmail}`);
-    } catch (err: any) { console.error(err); alert("Failed to resend: " + err.message); setIsSendingConf(false); }
+    
+    const dateStr = format(getSafeDate(job.selectedDate) || new Date(), 'EEEE, MMMM do');
+    const subject = encodeURIComponent("Reservation Confirmed - Clear View LLC");
+    const body = encodeURIComponent(`Hi ${job.firstName},\n\nYour reservation for ${dateStr} at ${fullAddress} is confirmed! We look forward to seeing you.\n\nBest,\nClear View LLC`);
+    
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${finalEmail}&su=${subject}&body=${body}`, '_blank');
+    
+    setConfSent(true); 
+    setTimeout(() => setConfSent(false), 3000);
+    setIsSendingConf(false);
   };
 
   const handleRescheduleDate = (date: Date | undefined) => {
@@ -225,7 +188,6 @@ const JobCard: React.FC<JobCardProps> = ({
         <div className="animate-in fade-in zoom-in-95 duration-500">
           <div className="flex flex-col lg:grid lg:grid-cols-12 gap-10 mb-12 items-start">
             
-            {/* Mission Payload Summary */}
             <div className="lg:col-span-4 space-y-6 bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group w-full">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-blue-600/20 transition-all duration-1000" />
               <div className="flex items-center gap-3 mb-4 relative z-10">
@@ -287,13 +249,12 @@ const JobCard: React.FC<JobCardProps> = ({
                     <div className="absolute right-0 top-full mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 p-3 z-50 animate-in slide-in-from-top-2 text-left">
                       {allTechs.map(emp => {
                         const hasDeclined = job.declinedBy?.includes(emp.id) || job.declinedBy?.includes(emp.email);
+                        const isOnline = emp.status?.toLowerCase().includes('in');
                         return (
                           <button
                             key={emp.id}
                             onClick={() => {
                               if (!emp.isOffDuty) {
-                                // Logic: If we are assigning a tech who previously declined,
-                                // we clear them from the declinedBy list so it's a fresh assignment.
                                 const nextDeclined = (job.declinedBy || []).filter((id: string) => id !== emp.id && id !== emp.email);
                                 updateJob?.(job.id, job, { 
                                   assignedTo: emp.id,
@@ -310,6 +271,7 @@ const JobCard: React.FC<JobCardProps> = ({
                           >
                             <div className="flex flex-col gap-0.5">
                               <div className="flex items-center gap-2">
+                                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
                                 <span>{emp.name}</span>
                                 {hasDeclined && (
                                   <span className="bg-orange-500 text-white px-2 py-0.5 rounded-full text-[6px] font-black tracking-widest animate-pulse">DECLINED</span>
@@ -331,58 +293,35 @@ const JobCard: React.FC<JobCardProps> = ({
               ) : (
                 <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-2xl border border-slate-800 shadow-xl text-left w-full sm:w-auto">
                   <div className="flex items-center gap-4 px-6 py-2 text-left flex-1">
-                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${assignedMember?.status === 'clocked_in' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${assignedMember?.status?.toLowerCase().includes('in') ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
                     <div className="text-left"><p className="text-[7px] font-black text-slate-500 uppercase tracking-widest text-left">Technician</p><p className="text-xs font-black text-white uppercase italic tracking-tighter text-left">{assignedMember?.name}</p></div>
                   </div>
-                  <button onClick={() => updateJob?.(job.id, job, { assignedTo: null }, true)} className="p-3 bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all shrink-0"><X size={14} /></button>
+                  <button 
+                    onClick={() => {
+                      if (isAdmin) {
+                        updateJob?.(job.id, job, { assignedTo: null }, true);
+                      } else if (userEmail) {
+                        const isAssignedToMe = job.assignedTo === userEmail || assignedMember?.email === userEmail || assignedMember?.id === userEmail;
+                        if (isAssignedToMe) {
+                          if (window.confirm("Reject this mission? It will be sent back to HQ for reassignment.")) {
+                            const currentDeclined = Array.isArray(job.declinedBy) ? [...job.declinedBy] : [];
+                            if (userEmail && !currentDeclined.includes(userEmail)) {
+                              currentDeclined.push(userEmail);
+                            }
+                            updateJob?.(job.id, job, { 
+                              assignedTo: null, 
+                              declinedBy: currentDeclined 
+                            }, true);
+                          }
+                        }
+                      }
+                    }} 
+                    className="p-3 bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all shrink-0"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               )}
-            </div>
-          </div>
-
-          <div className="pt-12 border-t border-slate-100 space-y-12 text-left">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 text-left">
-              <div className="flex items-center gap-2 text-emerald-600 text-left"><Info size={18} /><h4 className="font-black uppercase italic text-sm tracking-tighter text-left">Work Order Specs</h4></div>
-              <button onClick={() => toggleLock?.(job.id)} className={`flex items-center gap-2 px-6 py-2.5 rounded-full transition-all font-black text-[8px] uppercase tracking-widest border w-full sm:w-auto justify-center ${isUnlocked ? 'bg-emerald-500 text-white border-emerald-600 shadow-lg' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>{isUnlocked ? <Unlock size={12} /> : <Lock size={12} />} {isUnlocked ? 'Safe-Edit Mode Active' : 'Unlock to Edit'}</button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 text-left">
-              <div className="lg:col-span-4 space-y-8 text-left">
-                <div className="grid grid-cols-2 gap-3 text-left">
-                  <ParamBtn label="Stories" value={job.stories} onClick={() => updateJob?.(job.id, job, { stories: (job.stories % 3) + 1 })} active />
-                  <ParamBtn label="Bedrooms" value={job.homeSize} onClick={() => updateJob?.(job.id, job, { homeSize: job.homeSize === '1-2' ? '3-4' : job.homeSize === '3-4' ? '5+' : '1-2' })} active />
-                </div>
-                <div className={`bg-slate-50 p-4 sm:p-6 rounded-[2.5rem] border border-slate-100 transition-opacity flex flex-col items-center ${!isUnlocked ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
-                  <DayPicker mode="single" selected={getSafeDate(job.selectedDate) || undefined} onSelect={handleRescheduleDate} disabled={{ before: new Date() }} />
-                  <div className="grid grid-cols-3 gap-2 mt-6 w-full">
-                    {slots.map(slot => (<button key={slot} disabled={!isUnlocked} onClick={() => updateJob?.(job.id, job, { timeSlot: slot })} className={`py-3 rounded-xl text-[7px] font-black uppercase border transition-all ${normalizeSlot(job.timeSlot) === slot ? 'bg-emerald-500 border-emerald-600 text-white shadow-md' : 'bg-white text-slate-400 border-slate-100'}`}>{TIME_SLOT_MAP[slot] || slot}</button>))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="lg:col-span-8 space-y-12 text-left">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                  <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 text-left">
-                    <div className="flex items-center gap-2 text-emerald-600 text-left"><Sparkles size={16} /><p className="text-[10px] font-black uppercase tracking-widest italic text-left">Service Toggles</p></div>
-                    <div className="grid grid-cols-1 gap-3 text-left">
-                      <SubToggle label="Mark as Go-Back / REDO" active={job.isGoBack} onClick={() => updateJob?.(job.id, job, { isGoBack: !job.isGoBack })} icon={<RefreshCw size={12} />} />
-                      <SubToggle label="Downspout Flush" active={job.gutterFlush} onClick={() => updateJob?.(job.id, job, { gutterFlush: !job.gutterFlush })} icon={<Droplets size={12} />} />
-                      <SubToggle label="Roof Blow-off" active={job.roofBlowOff} onClick={() => updateJob?.(job.id, job, { roofBlowOff: !job.roofBlowOff })} icon={<Wind size={12} />} />
-                      <SubToggle label="Baking Soda Treatment" active={job.mossTreatment} onClick={() => updateJob?.(job.id, job, { mossTreatment: !job.mossTreatment })} icon={<Activity size={12} />} />
-                      <SubToggle label="Acid Wash Removal" active={job.mossAcidWash} onClick={() => updateJob?.(job.id, job, { mossAcidWash: !job.mossAcidWash })} icon={<Sparkles size={12} />} />
-                    </div>
-                  </div>
-                  <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 text-left">
-                    <div className="flex items-center gap-2 text-emerald-600 text-left"><Smartphone size={16} /><p className="text-[10px] font-black uppercase tracking-widest italic text-left">Misc Options</p></div>
-                    <div className="grid grid-cols-1 gap-3 text-left">
-                      <SubToggle label="Deluxe Screen Detail" active={job.deluxeWindow} onClick={() => updateJob?.(job.id, job, { deluxeWindow: !job.deluxeWindow })} icon={<Sun size={12} />} />
-                      <SubToggle label="Exterior Gutter Wash" active={job.deluxeGutter} onClick={() => updateJob?.(job.id, job, { deluxeGutter: !job.deluxeGutter })} icon={<Sparkles size={12} />} />
-                      <SubToggle label="Military Discount (10%)" active={job.militaryDiscount} onClick={() => updateJob?.(job.id, job, { militaryDiscount: !job.militaryDiscount })} icon={<ShieldCheck size={12} />} />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4 text-left"><div className="flex items-center gap-2 text-slate-400 text-left"><HandCoins size={16} /><p className="text-[10px] font-black uppercase tracking-widest italic text-left">Technician Notes</p></div><textarea readOnly={!isUnlocked} defaultValue={job.memo} onBlur={(e) => updateJob?.(job.id, job, { memo: e.target.value })} className={`w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs font-bold outline-none min-h-[120px] transition-all shadow-inner text-left ${isUnlocked ? 'focus:border-emerald-600 bg-white' : ''}`} placeholder="Update job details..." /></div>
-              </div>
             </div>
           </div>
         </div>

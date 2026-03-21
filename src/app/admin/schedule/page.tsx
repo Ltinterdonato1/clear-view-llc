@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
-import { db } from '../../../lib/firebase';
+import { db, functions } from '../../../lib/firebase';
 import { collection, query, onSnapshot, orderBy, doc, updateDoc, addDoc, where, getDocs, limit, deleteDoc, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore'; 
+import { httpsCallable } from 'firebase/functions';
 import { 
   ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, Banknote, CreditCard, Loader2, ArrowRight, Receipt, Users, MessageSquare, Mail, Smartphone, CheckSquare, MapPin, Activity, UserCheck
 } from 'lucide-react';
@@ -28,6 +29,7 @@ function ScheduleContent() {
   const [highlightedJobId, setHighlightedJobId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!searchParams) return;
     const dateParam = searchParams.get('date');
     if (dateParam) {
       try {
@@ -40,6 +42,7 @@ function ScheduleContent() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (!searchParams) return;
     const highlightParam = searchParams.get('highlight');
     if (highlightParam && jobs.length > 0) {
       setHighlightedJobId(highlightParam);
@@ -174,19 +177,19 @@ function ScheduleContent() {
     try {
       const paidAmount = parseFloat(receivedAmount) || 0;
       const name = completingLead.template?.data?.fullName || `${completingLead.firstName || ''} ${completingLead.lastName || ''}`.trim() || 'Valued Customer';
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: paidAmount,
-          leadId: completingLead.id,
-          customerEmail: completingLead.email || completingLead.template?.data?.email,
-          customerName: name
-        }),
+      
+      // Use the 'functions' object from '../../lib/firebase' as initialized there
+      const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
+      const result = await createStripeCheckout({
+        amount: paidAmount,
+        leadId: completingLead.id,
+        customerEmail: completingLead.email || completingLead.template?.data?.email,
+        customerName: name
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      window.location.href = data.url;
+      const data = result.data as { url: string };
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (err: any) {
       console.error('Stripe redirect failed:', err);
       alert(`Stripe Error: ${err.message}`);
@@ -271,7 +274,7 @@ function ScheduleContent() {
   };
 
   const branchFilteredJobs = useMemo(() => {
-    return jobs.filter(j => j.branch === selectedBranch);
+    return jobs.filter(j => (j.branch || 'Tri-Cities') === selectedBranch);
   }, [jobs, selectedBranch]);
 
   const filteredJobs = useMemo(() => {
@@ -286,19 +289,23 @@ function ScheduleContent() {
   }, [allEmployees, selectedBranch]);
 
   const unassignedJobs = useMemo(() => {
-    return branchFilteredJobs.filter(j => !j.assignedTo && j.status !== 'Archived' && j.status !== 'Completed' && !j.isNotification);
+    return branchFilteredJobs.filter(j => 
+      !j.assignedTo && 
+      !['Archived', 'Completed', 'archived', 'completed'].includes(j.status) && 
+      !j.isNotification
+    );
   }, [branchFilteredJobs]);
 
   const unassignedByBranch = useMemo(() => {
     const counts: Record<string, number> = {};
     BRANCHES.forEach(b => {
-      counts[b] = jobs.filter(j => 
-        j.branch === b && 
-        !j.assignedTo && 
-        j.status !== 'Archived' && 
-        j.status !== 'Completed' && 
-        !j.isNotification
-      ).length;
+      counts[b] = jobs.filter(j => {
+        const jobBranch = j.branch || 'Tri-Cities';
+        return jobBranch === b && 
+          !j.assignedTo && 
+          !['Archived', 'Completed', 'archived', 'completed'].includes(j.status) && 
+          !j.isNotification;
+      }).length;
     });
     return counts;
   }, [jobs]);
@@ -483,6 +490,7 @@ function ScheduleContent() {
               key={job.id} job={job} isAdmin={true} allEmployees={employeesWithOffDuty}
               unlockedJobs={unlockedJobs} isUpdating={isUpdating} toggleLock={toggleLock}
               updateJob={updateJob} deleteJob={deleteJob} setCompletingJob={setCompletingLead}
+              userEmail={'clearview3cleaners@gmail.com'}
               currentDayTime={startOfDay(new Date(viewDate.getFullYear(), viewDate.getMonth(), selectedDay)).getTime()}
               isNearby={index > 0 && job.city === filteredJobs[index - 1].city}
               initialExpanded={job.id === highlightedJobId}

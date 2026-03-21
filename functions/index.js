@@ -2,91 +2,88 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
 const Stripe = require("stripe");
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
 
-// IMPORTANT: Add your Stripe Secret Key to Firebase Config:
-// firebase functions:secrets:set STRIPE_SECRET_KEY=sk_test_...
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2026-01-28.clover',
+// Configure Mailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'clearview3cleaners@gmail.com',
+    pass: 'mixjihjfnzdwfyev'
+  }
 });
 
-// --- 1. Stripe Checkout Generation ---
-exports.createStripeCheckout = onCall({ secrets: ["STRIPE_SECRET_KEY"] }, async (request) => {
-  const data = request.data;
-  const { leadId, customerEmail, customerName } = data;
-  const amount = parseFloat(data.amount) || 0;
-
-  if (amount <= 0) {
-    throw new HttpsError("invalid-argument", "Amount must be greater than $0.");
+/**
+ * Sends email directly using Nodemailer
+ */
+async function sendMail(to, subject, text, html) {
+  try {
+    await transporter.sendMail({
+      from: '"Clear View LLC" <clearview3cleaners@gmail.com>',
+      replyTo: 'clearview3cleaners@gmail.com',
+      to,
+      subject,
+      text,
+      html
+    });
+    console.log(`Email successfully handed off to Gmail SMTP for: ${to}`);
+  } catch (error) {
+    console.error("Nodemailer Error:", error);
+    throw new HttpsError("internal", error.message);
   }
+}
 
-  const baseUrl = "https://clearview3cleaners.com"; // Updated to your GoDaddy domain
+// 1. Stripe Checkout
+exports.createStripeCheckout = onCall({ secrets: ["STRIPE_SECRET_KEY"] }, async (request) => {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2026-01-28.clover',
+  });
+  const { leadId, customerEmail, customerName, amount } = request.data;
+  if (!amount || amount <= 0) throw new HttpsError("invalid-argument", "Invalid amount.");
 
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Service for ${customerName || 'Valued Customer'}`,
-              description: `Job Ref: ${leadId}`,
-            },
-            unit_amount: Math.round(amount * 100),
-          },
-          quantity: 1,
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: `Service for ${customerName}`, description: `Job Ref: ${leadId}` },
+          unit_amount: Math.round(amount * 100),
         },
-      ],
+        quantity: 1,
+      }],
       mode: 'payment',
       customer_email: customerEmail,
-      metadata: { leadId: leadId },
-      success_url: `${baseUrl}/admin/payment-success?session_id={CHECKOUT_SESSION_ID}&leadId=${leadId}`,
-      cancel_url: `${baseUrl}/admin/dashboard`,
+      metadata: { leadId },
+      success_url: `https://clearview3cleaners.com/admin/payment-success?leadId=${leadId}`,
+      cancel_url: `https://clearview3cleaners.com/admin/dashboard`,
     });
-
     return { url: session.url };
-  } catch (error) {
-    console.error("Stripe Error:", error);
-    throw new HttpsError("internal", error.message);
-  }
+  } catch (error) { throw new HttpsError("internal", error.message); }
 });
 
-// --- 2. Staff Management ---
+// 2. Staff Management
 exports.createStaffAccount = onCall(async (request) => {
   const data = request.data;
-  const cleanEmail = data.email.toLowerCase().trim();
-  const existingDoc = await admin.firestore().collection("employees").doc(cleanEmail).get();
-  if (existingDoc.exists) throw new HttpsError("already-exists", "Staff member exists.");
-
-  const userRecord = await admin.auth().createUser({ email: cleanEmail, password: data.password, displayName: data.name });
-  await admin.auth().setCustomUserClaims(userRecord.uid, { role: data.role });
-  await admin.firestore().collection("employees").doc(cleanEmail).set({
-    name: data.name, email: cleanEmail, phone: data.phone || '', homeBranch: data.homeBranch || 'Tri-Cities',
-    hourlyRate: parseFloat(data.hourlyRate) || 0, uid: userRecord.uid, role: data.role, status: "clocked_out", createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  const userRecord = await admin.auth().createUser({ email: data.email, password: data.password, displayName: data.name });
+  await admin.firestore().collection("employees").doc(data.email.toLowerCase()).set({ ...data, uid: userRecord.uid });
   return { success: true };
 });
 
 exports.updateStaffPassword = onCall(async (request) => {
   const { uid, newPassword } = request.data;
-  if (!uid || !newPassword) {
-    throw new HttpsError("invalid-argument", "Missing UID or password.");
-  }
   try {
     await admin.auth().updateUser(uid, { password: newPassword });
     return { success: true };
-  } catch (error) {
-    console.error("Auth Update Error:", error);
-    throw new HttpsError("internal", error.message);
-  }
+  } catch (error) { throw new HttpsError("internal", error.message); }
 });
 
-// --- 3. SMS Logic ---
+// 3. SMS Logic
 exports.sendSmsOnRequest = onDocumentCreated("sms_messages/{docId}", async (event) => {
   const data = event.data.data();
   let { to, body } = data;
@@ -101,38 +98,48 @@ exports.sendSmsOnRequest = onDocumentCreated("sms_messages/{docId}", async (even
   } catch (error) { return event.data.ref.update({ status: 'error', error: error.message }); }
 });
 
-// --- 4. Automated Receipts ---
-exports.handleLeadReceipts = onDocumentUpdated("leads/{leadId}", async (event) => {
-  const before = event.data.before.data();
-  const after = event.data.after.data();
-  const db = admin.firestore();
+// 4. Automated Booking Confirmation
+exports.onLeadCreated = onDocumentCreated("leads/{leadId}", async (event) => {
+  const job = event.data.data();
+  if (job.isNotification || !job.email || job.status === 'Archived') return;
 
-  if (before.status !== 'Archived' && after.status === 'Archived') {
-    const email = after.email || after.customerEmail;
-    if (email) {
-      await db.collection("mail").add({
-        to: [email],
-        message: {
-          subject: `Payment Receipt - Clear View LLC`,
-          html: `<h2>Payment Received</h2><p>Hi ${after.firstName}, thank you for your payment of $${after.collectedAmount}!</p>`
-        }
-      });
-    }
+  const html = `<!DOCTYPE html><html><body><h1>Reservation Confirmed</h1><p>Hi ${job.firstName}, your service at ${job.address} is confirmed for ${job.appointmentDate}.</p></body></html>`;
+  await sendMail(job.email, "Reservation Confirmed - Clear View LLC", "Reservation Confirmed.", html);
+});
+
+// 5. Automated Payment Receipt
+exports.handleLeadReceipts = onDocumentUpdated("leads/{leadId}", async (event) => {
+  const after = event.data.after.data();
+  if (event.data.before.data().status !== 'Archived' && after.status === 'Archived' && after.email) {
+    await sendMail(after.email, "Payment Receipt", "Payment Received.", `<h2>Payment Received</h2><p>Thank you!</p>`);
   }
 });
 
-// --- 5. Scheduled Reminders ---
+// 6. Manual Email Trigger (Bypasses Firestore Extension entirely)
+exports.sendManualEmail = onCall(async (request) => {
+  const { to, subject, text, html } = request.data;
+  await sendMail(to, subject, text, html);
+  return { success: true };
+});
+
+// 7. Scheduled Reminders
 exports.dispatchDailyReminders = onSchedule({ schedule: "0 8 * * *", timeZone: "America/Los_Angeles" }, async (event) => {
   const db = admin.firestore();
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0,0,0,0);
   const snapshot = await db.collection("leads").where("status", "in", ["Scheduled", "scheduled"]).get();
   snapshot.docs.forEach(async (doc) => {
     const job = doc.data();
     if (job.email) {
-      await db.collection("mail").add({
-        to: [job.email],
-        message: { subject: `Reminder: Service Tomorrow`, html: `<p>Reminder: Service at ${job.address} tomorrow.</p>` }
-      });
+      await sendMail(job.email, "Reminder: Service Tomorrow", "Reminder: You have a service scheduled for tomorrow.", `<p>Reminder: Service at ${job.address} tomorrow.</p>`);
     }
   });
 });
+
+// Final Exports for Firebase
+exports.createStripeCheckout = exports.createStripeCheckout;
+exports.createStaffAccount = exports.createStaffAccount;
+exports.updateStaffPassword = exports.updateStaffPassword;
+exports.sendSmsOnRequest = exports.sendSmsOnRequest;
+exports.onLeadCreated = exports.onLeadCreated;
+exports.handleLeadReceipts = exports.handleLeadReceipts;
+exports.sendManualEmail = exports.sendManualEmail;
+exports.dispatchDailyReminders = exports.dispatchDailyReminders;

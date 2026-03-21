@@ -1,8 +1,9 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { db, auth } from '../../../lib/firebase';
+import { db, auth, functions } from '../../../lib/firebase';
 import { collection, query, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
 import { 
   ChevronLeft, ChevronRight, X, Banknote, Mail, 
   CreditCard, Loader2, ArrowRight, Receipt, MessageSquare, Smartphone, CheckSquare, Calendar,
@@ -94,19 +95,18 @@ export default function CrewSchedule() {
     try {
       const paidAmount = parseFloat(receivedAmount) || 0;
       const name = completingLead.template?.data?.fullName || `${completingLead.firstName || ''} ${completingLead.lastName || ''}`.trim() || 'Valued Customer';
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: paidAmount,
-          leadId: completingLead.id,
-          customerEmail: completingLead.email || completingLead.template?.data?.email,
-          customerName: name
-        }),
+      
+      const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
+      const result = await createStripeCheckout({
+        amount: paidAmount,
+        leadId: completingLead.id,
+        customerEmail: completingLead.email || completingLead.template?.data?.email,
+        customerName: name
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      window.location.href = data.url;
+      const data = result.data as { url: string };
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (err: any) {
       console.error('Stripe redirect failed:', err);
       alert(`Stripe Error: ${err.message}`);
@@ -122,18 +122,15 @@ export default function CrewSchedule() {
       const name = completingLead.template?.data?.fullName || `${completingLead.firstName || ''} ${completingLead.lastName || ''}`.trim() || 'Valued Customer';
       const customerEmail = completingLead.email || completingLead.template?.data?.email || "";
 
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: paidAmount,
-          leadId: completingLead.id,
-          customerEmail: customerEmail,
-          customerName: name
-        }),
+      const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
+      const result = await createStripeCheckout({
+        amount: paidAmount,
+        leadId: completingLead.id,
+        customerEmail: customerEmail,
+        customerName: name
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      const data = result.data as { url: string };
+      if (!data.url) throw new Error("Failed to generate payment link.");
 
       // --- Service Breakdown Logic ---
       const breakdownItems: string[] = [];
@@ -166,8 +163,10 @@ export default function CrewSchedule() {
       if (!customerEmail) throw new Error("No email address found for this customer.");
       await addDoc(collection(db, "mail"), {
         to: [customerEmail],
+        from: 'clearview3cleaners@gmail.com',
         message: {
           subject: `Thank you for your business! - Clear View LLC`,
+          text: `Service Complete at ${completingLead.address}. Please pay your invoice online. Thank you for choosing Clear View LLC!`,
           html: `
 <!DOCTYPE html>
 <html>
@@ -249,8 +248,10 @@ ${finalBreakdown}
       if (customerEmail) {
         await addDoc(collection(db, "mail"), {
           to: [customerEmail],
+          from: 'clearview3cleaners@gmail.com',
           message: {
             subject: `Payment Receipt - Clear View LLC`,
+            text: `Payment Received for service at ${completingLead.address}. Thank you for your business!`,
             html: `
 <!DOCTYPE html>
 <html>

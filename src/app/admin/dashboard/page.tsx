@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '../../../lib/firebase'; 
+import { db, functions } from '../../../lib/firebase'; 
 import { collection, query, onSnapshot, orderBy, doc, updateDoc, addDoc, where, getDocs, limit, deleteDoc, serverTimestamp } from 'firebase/firestore'; 
+import { httpsCallable } from 'firebase/functions'; 
 import { 
   Search, User, MapPin, CheckCircle2, CreditCard, 
   Banknote, Receipt, X, ChevronDown, ChevronUp, PhoneCall, 
@@ -130,19 +131,18 @@ export default function AdminDashboard() {
     try {
       const paidAmount = parseFloat(receivedAmount) || 0;
       const name = completingLead.template?.data?.fullName || `${completingLead.firstName || ''} ${completingLead.lastName || ''}`.trim() || 'Valued Customer';
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: paidAmount,
-          leadId: completingLead.id,
-          customerEmail: completingLead.email || completingLead.template?.data?.email,
-          customerName: name
-        }),
+      
+      const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
+      const result = await createStripeCheckout({
+        amount: paidAmount,
+        leadId: completingLead.id,
+        customerEmail: completingLead.email || completingLead.template?.data?.email,
+        customerName: name
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      window.location.href = data.url;
+      const data = result.data as { url: string };
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (err: any) {
       console.error('Stripe redirect failed:', err);
       alert(`Stripe Error: ${err.message}`);
@@ -158,18 +158,15 @@ export default function AdminDashboard() {
       const name = completingLead.template?.data?.fullName || `${completingLead.firstName || ''} ${completingLead.lastName || ''}`.trim() || 'Valued Customer';
       const customerEmail = completingLead.email || completingLead.template?.data?.email || "";
 
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: paidAmount,
-          leadId: completingLead.id,
-          customerEmail: customerEmail,
-          customerName: name
-        }),
+      const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
+      const result = await createStripeCheckout({
+        amount: paidAmount,
+        leadId: completingLead.id,
+        customerEmail: customerEmail,
+        customerName: name
       });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      const data = result.data as { url: string };
+      if (!data.url) throw new Error("Failed to generate payment link.");
 
       // --- Service Breakdown Logic ---
       const breakdownItems: string[] = [];
@@ -202,8 +199,10 @@ export default function AdminDashboard() {
       if (!customerEmail) throw new Error("No email address found for this customer.");
       await addDoc(collection(db, "mail"), {
         to: [customerEmail],
+        from: 'clearview3cleaners@gmail.com',
         message: {
           subject: `Thank you for your business! - Clear View LLC`,
+          text: `Service complete at ${completingLead.address}. Thank you for your business!`,
           html: `
 <!DOCTYPE html>
 <html>
@@ -286,8 +285,10 @@ ${finalBreakdown}
       if (customerEmail) {
         await addDoc(collection(db, "mail"), {
           to: [customerEmail],
+          from: 'clearview3cleaners@gmail.com',
           message: {
             subject: `Payment Receipt - Clear View LLC`,
+            text: `Payment Receipt for your service at ${completingLead.address}. Thank you!`,
             html: `
 <!DOCTYPE html>
 <html>
@@ -542,7 +543,7 @@ ${finalBreakdown}
               <div className="space-y-8">
                 <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 text-center">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Total Cash Received</p>
-                  <input type="number" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-2xl py-6 px-8 text-4xl font-black text-slate-900 outline-none focus:border-emerald-600 transition-all text-center [appearance:textfield]" autoFocus />
+                  <input type="number" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} className="w-full bg-white border-2 border-transparent rounded-2xl py-6 px-8 text-4xl font-black text-slate-900 outline-none focus:border-emerald-600 transition-all text-center [appearance:textfield]" autoFocus />
                   <div className="mt-6 flex justify-between items-center px-4">
                     <div className="text-left"><p className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic">Bill Balance</p><p className="text-xl font-black text-slate-400">${completingLead?.total || completingLead?.finalPrice || '0'}</p></div>
                     <div className="text-right"><p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest italic">Calculated Tip</p><p className="text-2xl font-black text-emerald-600 italic leading-none">${Math.max(0, (parseFloat(receivedAmount) || 0) - (parseFloat(completingLead?.total || completingLead?.finalPrice || '0'))).toFixed(2)}</p></div>

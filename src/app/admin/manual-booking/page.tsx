@@ -103,6 +103,7 @@ export default function ManualBooking() {
       
       const leadPayload = {
         ...formData,
+        branch: formData.branch || 'Tri-Cities', // Ensure branch is explicitly set
         status: 'Confirmed',
         createdAt: serverTimestamp(),
         total: formData.totalAmount,
